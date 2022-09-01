@@ -50,30 +50,30 @@ int main(int argc, char **argv)
 		destination_index = 1071;
 	}
 
-	else if (input_dataset.compare("EP_200192.off") == 0)
-	{
-		source_index = 14527;
-		destination_index = 72453;
-	}
-	else if (input_dataset.compare("EP_401170.off") == 0)
-	{
-		source_index = 28645;
-		destination_index = 145290;
-	}
-	else if (input_dataset.compare("EP_600996.off") == 0)
-	{
-		source_index = 43052;
-		destination_index = 217308;
-	}
-	else if (input_dataset.compare("EP_800768.off") == 0)
-	{
-		source_index = 57340;
-		destination_index = 289612;
-	}
 	else if (input_dataset.compare("EP_1000768.off") == 0)
 	{
 		source_index = 71991;
 		destination_index = 361379;
+	}
+	else if (input_dataset.compare("EP_2002080.off") == 0)
+	{
+		source_index = 143108;
+		destination_index = 722722;
+	}
+	else if (input_dataset.compare("EP_3001050.off") == 0)
+	{
+		source_index = 215239;
+		destination_index = 1082878;
+	}
+	else if (input_dataset.compare("EP_4003072.off") == 0)
+	{
+		source_index = 286252;
+		destination_index = 1445064;
+	}
+	else if (input_dataset.compare("EP_5004800.off") == 0)
+	{
+		source_index = 358231;
+		destination_index = 1806589;
 	}
 	else if (input_dataset.compare("EP_small_10082.off") == 0)
 	{

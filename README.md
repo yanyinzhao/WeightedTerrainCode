@@ -29,16 +29,18 @@ The datasets are as follows:
 - "EP.off" (with dataset size of 296576)
 - "BH_small.off" (a sub-region of "BH.off" with dataset size of 2738)
 - "EP_small.off" (a sub-region of "EP.off" with dataset size of 2738)
-- "EP_200192.off" (generated using "EP.off" with dataset size of 200192)
-- "EP_401170.off" (generated using "EP.off" with dataset size of 401170)
-- "EP_600996.off" (generated using "EP.off" with dataset size of 600996)
-- "EP_800768.off" (generated using "EP.off" with dataset size of 800768)
 - "EP_1000768.off" (generated using "EP.off" with dataset size of 1000768)
+- "EP_2002080.off" (generated using "EP.off" with dataset size of 2002080)
+- "EP_3001050.off" (generated using "EP.off" with dataset size of 3001050)
+- "EP_4003072.off" (generated using "EP.off" with dataset size of 4003072)
+- "EP_5004800.off" (generated using "EP.off" with dataset size of 5004800)
 - "EP_small_10082.off" (generated using "EP_small.off" with dataset size of 10082)
 - "EP_small_20000.off" (generated using "EP_small.off" with dataset size of 20000)
 - "EP_small_30258.off" (generated using "EP_small.off" with dataset size of 30258)
 - "EP_small_40328.off" (generated using "EP_small.off" with dataset size of 40328)
 - "EP_small_50562.off" (generated using "EP_small.off" with dataset size of 50562)
+
+Since the file size for the dataset "EP_1000768.off", "EP_2002080.off", "EP_3001050.off", "EP_4003072.off", and "EP_5004800.off" are too large (i.e., they exceed the maximum file size for Github), please download these five files at https://www.dropbox.com/sh/eqwssovnb17rgos/AAASXI-xAnrYsRTvTWSfnBJ6a?dl=0, and put them back in "input/" folder.
 
 Data Format:
 
