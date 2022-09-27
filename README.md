@@ -69,7 +69,7 @@ last_face_1st_vertex_ID last_face_2nd_vertex_ID last_face_3td_vertex_ID
 ```
 
 ## Compile command
----
+
 ```
 cd src
 g++ -o main main.cpp -std=c++11
