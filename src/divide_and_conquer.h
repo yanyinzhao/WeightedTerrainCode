@@ -1766,7 +1766,7 @@ void fixed_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::Surface
                                          std::vector<geodesic::SurfacePoint> &path,
                                          std::string write_file_header,
                                          double Steiner_point_epsilon, int estimate_path_length,
-                                         double snell_law_epsilon, double total_distance_exact_path,
+                                         double total_distance_exact_path,
                                          std::vector<geodesic::SurfacePoint> &result_path)
 {
     double building_time;
@@ -1776,7 +1776,7 @@ void fixed_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::Surface
 
     double total_distance_Steiner_point;
     total_distance_Steiner_point = path_distance(path, path);
-    std::cout << "Fixed Steiner point law distance: " << total_distance_Steiner_point << std::endl;
+    std::cout << "Fixed Steiner point distance: " << total_distance_Steiner_point << std::endl;
 
     result_path.clear();
     for (int i = 0; i < path.size(); ++i)
@@ -1818,7 +1818,7 @@ void log_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::SurfacePo
                                        std::vector<geodesic::SurfacePoint> &path,
                                        std::string write_file_header,
                                        double Steiner_point_epsilon,
-                                       double snell_law_epsilon, double total_distance_exact_path,
+                                       double total_distance_exact_path,
                                        std::vector<geodesic::SurfacePoint> &result_path)
 {
     double building_time;
@@ -1828,7 +1828,7 @@ void log_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::SurfacePo
 
     double total_distance_Steiner_point;
     total_distance_Steiner_point = path_distance(path, path);
-    std::cout << "Log Steiner point law distance: " << total_distance_Steiner_point << std::endl;
+    std::cout << "Log Steiner point distance: " << total_distance_Steiner_point << std::endl;
 
     result_path.clear();
     for (int i = 0; i < path.size(); ++i)

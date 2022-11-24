@@ -100,6 +100,21 @@ int main(int argc, char **argv)
 		source_index = 3403;
 		destination_index = 22196;
 	}
+	else if (input_dataset.compare("SB.off") == 0)
+	{
+		source_index = 400;
+		destination_index = 226;
+	}
+	else if (input_dataset.compare("CP.off") == 0)
+	{
+		source_index = 400;
+		destination_index = 226;
+	}
+	else if (input_dataset.compare("PA.off") == 0)
+	{
+		source_index = 537;
+		destination_index = 297;
+	}
 	else
 	{
 		std::cout << "Dataset not exist!" << std::endl;
@@ -170,7 +185,7 @@ int main(int argc, char **argv)
 	{
 
 		std::cout << "== FSP ==" << std::endl;
-		fixed_Steiner_point_with_exp_output(&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, estimate_path_length, snell_law_epsilon, exact_result_path_distance, fixed_Steiner_point_result_path);
+		fixed_Steiner_point_with_exp_output(&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, estimate_path_length, exact_result_path_distance, fixed_Steiner_point_result_path);
 		std::cout << std::endl;
 
 		std::cout << "== FSP-BSSL ==" << std::endl;
@@ -183,7 +198,7 @@ int main(int argc, char **argv)
 	}
 
 	std::cout << "== LSP ==" << std::endl;
-	log_Steiner_point_with_exp_output(&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, estimate_path_length, snell_law_epsilon, fixed_Steiner_point_result_path);
+	log_Steiner_point_with_exp_output(&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, exact_result_path_distance, log_Steiner_point_result_path);
 	std::cout << std::endl;
 
 	std::cout << "== DLSP-BSSL ==" << std::endl;
