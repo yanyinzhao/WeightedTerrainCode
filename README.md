@@ -4,15 +4,15 @@
 
 This project provides the implementation of the algorithm for finding the shortest path on 3D weighted terrain surface using divide-and-conquer and effective weight.
 
-Our algorithm DLSP-EWSL, and the baseline algorithms, i.e., algorithm FSP, algorithm LSP and algorithm FSP-BSSL, are studied in the experiments. But the calculated weighted shortest path of algorithm FSP and algorithm LSP do not follow Snell's law, so they are not our main focus. In order to conduct the ablation study, i.e., show the superior performance of our algorithms in both edge sequence finding step and edge sequence based weighted shortest path finding step, we also interchanged two steps of algorithm DLSP-EWSL and algorithm FSP-BSSL. That is, we also studied algorithm FSP-EWSL and algorithm DLSP-BSSL in the experiments. In total, we compared six algorithms, i.e., algorithm FSP, algorithm LSP, algorithm FSP-BSSL, algorithm FSP-EWSL, algorithm DLSP-BSSL and algorithm DLSP-EWSL. We refer the readers to our paper for more details.
+Our algorithm DLSP-EWSL, and the baseline algorithms, i.e., algorithm FSP, algorithm LSP, algorithm FSP-BSSL, algorithm FSP-EWSL, and algorithm DLSP-BSSL are studied. We refer the readers to our paper for more details.
 
 In total, we compared six algorithms as follows:
 
 - algorithm FSP (baseline)
 - algorithm LSP (baseline)
 - algorithm FSP-BSSL (baseline)
-- algorithm FSP-EWSL (variation)
-- algorithm DLSP-BSSL (variation)
+- algorithm FSP-EWSL (baseline)
+- algorithm DLSP-BSSL (baseline)
 - algorithm DLSP-EWSL (our algorithm)
 
 Make sure there is a folder called "input/" and a folder called "output/" under the working directory. They will be used for storing the input/output files.
@@ -27,6 +27,9 @@ The datasets are as follows:
 
 - "BH.off" (with dataset size of 279684)
 - "EP.off" (with dataset size of 296576)
+- "SB.off" (with dataset size of 2048)
+- "CP.off" (with dataset size of 2048)
+- "PA.off" (with dataset size of 1136)
 - "BH_small.off" (a sub-region of "BH.off" with dataset size of 2738)
 - "EP_small.off" (a sub-region of "EP.off" with dataset size of 2738)
 - "EP_1000768.off" (generated using "EP.off" with dataset size of 1000768)
