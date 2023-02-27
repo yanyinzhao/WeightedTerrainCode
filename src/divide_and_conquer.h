@@ -1795,7 +1795,7 @@ void fixed_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::Surface
     std::cout << "Total distance: " << total_distance_Steiner_point << std::endl;
 
     std::ofstream ofs("../output/output.txt", std::ios_base::app);
-    ofs << "== FSP ==\n";
+    ofs << "== FixSP ==\n";
     ofs << write_file_header << "\t"
         << building_time << "\t"
         << Steiner_point_query_time << "\t"
@@ -1847,7 +1847,7 @@ void log_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::SurfacePo
     std::cout << "Total distance: " << total_distance_Steiner_point << std::endl;
 
     std::ofstream ofs("../output/output.txt", std::ios_base::app);
-    ofs << "== LSP ==\n";
+    ofs << "== LogSP ==\n";
     ofs << write_file_header << "\t"
         << building_time << "\t"
         << Steiner_point_query_time << "\t"
@@ -2006,7 +2006,7 @@ void fixed_Steiner_point_and_binary_search_snell_law(geodesic::Mesh *mesh, geode
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
     std::ofstream ofs("../output/output.txt", std::ios_base::app);
-    ofs << "== FSP-BSSL ==\n";
+    ofs << "== FixSP-BinarySearch ==\n";
     ofs << write_file_header << "\t"
         << building_time << "\t"
         << Steiner_point_query_time << "\t"
@@ -2164,7 +2164,7 @@ void fixed_Steiner_point_and_effective_weight_snell_law(geodesic::Mesh *mesh, ge
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
     std::ofstream ofs("../output/output.txt", std::ios_base::app);
-    ofs << "== FSP-EWSL ==\n";
+    ofs << "== FixSP-EffWeight ==\n";
     ofs << write_file_header << "\t"
         << building_time << "\t"
         << Steiner_point_query_time << "\t"
@@ -2327,7 +2327,7 @@ void log_Steiner_point_divide_and_conquer_and_binary_search_snell_law(geodesic::
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
     std::ofstream ofs("../output/output.txt", std::ios_base::app);
-    ofs << "== DLSP-BSSL ==\n";
+    ofs << "== ProgLogSP-BinarySearch ==\n";
     ofs << write_file_header << "\t"
         << total_building_time << "\t"
         << total_Steiner_point_query_time << "\t"
@@ -2489,7 +2489,7 @@ void log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(geodesi
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
     std::ofstream ofs("../output/output.txt", std::ios_base::app);
-    ofs << "== DLSP-EWSL ==\n";
+    ofs << "== ProgLogSP-EffWeight ==\n";
     ofs << write_file_header << "\t"
         << total_building_time << "\t"
         << total_Steiner_point_query_time << "\t"

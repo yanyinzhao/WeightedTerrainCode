@@ -4,16 +4,16 @@
 
 This project provides the implementation of the algorithm for finding the shortest path on 3D weighted terrain surface using divide-and-conquer and effective weight.
 
-Our algorithm DLSP-EWSL, and the baseline algorithms, i.e., algorithm FSP, algorithm LSP, algorithm FSP-BSSL, algorithm FSP-EWSL, and algorithm DLSP-BSSL are studied. We refer the readers to our paper for more details.
+Our algorithm ProgLogSP-EffWeight, and the baseline algorithms, i.e., algorithm FixSP, algorithm LogSP, algorithm FixSP-BinarySearch, algorithm FixSP-EffWeight, and algorithm ProgLogSP-BinarySearch are studied. We refer the readers to our paper for more details.
 
 In total, we compared six algorithms as follows:
 
-- algorithm FSP (baseline)
-- algorithm LSP (baseline)
-- algorithm FSP-BSSL (baseline)
-- algorithm FSP-EWSL (baseline)
-- algorithm DLSP-BSSL (baseline)
-- algorithm DLSP-EWSL (our algorithm)
+- algorithm FixSP (baseline)
+- algorithm LogSP (baseline)
+- algorithm FixSP-BinarySearch (baseline)
+- algorithm FixSP-EffWeight (baseline)
+- algorithm ProgLogSP-BinarySearch (baseline)
+- algorithm ProgLogSP-EffWeight (our algorithm)
 
 Make sure there is a folder called "input/" and a folder called "output/" under the working directory. They will be used for storing the input/output files.
 
@@ -81,24 +81,24 @@ g++ -o main main.cpp -std=c++11
 ## Run command
 
 ```
-./main [terrain_data] [epsilon_SP] [epsilon_SL] [calculate_exact_path] [calculate_FSP]
+./main [terrain_data] [epsilon_SP] [epsilon_SL] [calculate_exact_path] [calculate_FixSP]
 ```
 
 The meaning for each parameter is as follows:
 
 - [terrain_data]: terrain data file name
-- [epsilon_SP]: the epsilon value for both DLSP and LSP (0 < epsilon_SP <= 1)
-- [epsilon_SL]: the epsilon value for both EWSL and BSSL (0 < epsilon_SL <= 1)
+- [epsilon_SP]: the epsilon value for both ProgLogSP and LogSP (0 < epsilon_SP <= 1)
+- [epsilon_SL]: the epsilon value for both EffWeight and BinarySearch (0 < epsilon_SL <= 1)
 - [calculate_exact_path]: whether to calculate exact path, 1 for calculate exact path, 0 for not calculate exact path
-- [calculate_FSP]: whether to calculate FSP, 1 for calculate FSP, 0 for not calculate FSP
+- [calculate_FixSP]: whether to calculate FixSP, 1 for calculate FixSP, 0 for not calculate FixSP
 
-By default (even if you set both [calculate_exact_path] and [calculate_FSP] to 0), the project will run algorithm LSP, algorithm DLSP-BSSL and algorithm DLSP-EWSL without calculating the error ratio compared with the exact path (thus, the distance error compared with the exact path and the calculated path will be infinity).
+By default (even if you set both [calculate_exact_path] and [calculate_FixSP] to 0), the project will run algorithm LogSP, algorithm ProgLogSP-BinarySearch and algorithm ProgLogSP-EffWeight without calculating the error ratio compared with the exact path (thus, the distance error compared with the exact path and the calculated path will be infinity).
 
-When you set [calculate_exact_path] to 0 and [calculate_FSP] to 1, the project will run algorithm FSP, algorithm LSP, algorithm FSP-BSSL, algorithm FSP-EWSL, algorithm DLSP-BSSL and algorithm DLSP-EWSL without calculating the error ratio compared with the exact path (thus, the distance error compared with the exact path and the calculated path will be infinity).
+When you set [calculate_exact_path] to 0 and [calculate_FixSP] to 1, the project will run algorithm FixSP, algorithm LogSP, algorithm FixSP-BinarySearch, algorithm FixSP-EffWeight, algorithm ProgLogSP-BinarySearch and algorithm ProgLogSP-EffWeight without calculating the error ratio compared with the exact path (thus, the distance error compared with the exact path and the calculated path will be infinity).
 
-When you set both [calculate_exact_path] and [calculate_FSP] to 1, the project will run algorithm FSP, algorithm LSP, algorithm FSP-BSSL, algorithm FSP-EWSL, algorithm DLSP-BSSL and algorithm DLSP-EWSL and also calculate the error ratio compared with the exact path.
+When you set both [calculate_exact_path] and [calculate_FixSP] to 1, the project will run algorithm FixSP, algorithm LogSP, algorithm FixSP-BinarySearch, algorithm FixSP-EffWeight, algorithm ProgLogSP-BinarySearch and algorithm ProgLogSP-EffWeight and also calculate the error ratio compared with the exact path.
 
-We use FSP-BSSL and set epsilon = 0.05 (where epsilon = max(epsilon_SP, epsilon_SL) and we set epsilon_SP = epsilon_SL = 0.05) to simulate the exact path. So when you run the terrain data with dataset size more than 2000, we strongly encourage you to set [calculate_exact_path] to 0. Otherwise, it will take a very long time to simulate the exact path (which is not the main purpose of this project). You should simulate the exact path ONLY when you need to calculate the error ratio of the calculated path compared with the exact path in the experiment. In addition, when you run the terrain data with dataset size more than 20000, we strongly encourage you to set [calculate_FSP] to 0. Otherwise, it will take a very long time to run algorithm FSP (because algorithm FSP performs very bad when terrain data is large).
+We use FixSP-BinarySearch and set epsilon = 0.05 (where epsilon = max(epsilon_SP, epsilon_SL) and we set epsilon_SP = epsilon_SL = 0.05) to simulate the exact path. So when you run the terrain data with dataset size more than 2000, we strongly encourage you to set [calculate_exact_path] to 0. Otherwise, it will take a very long time to simulate the exact path (which is not the main purpose of this project). You should simulate the exact path ONLY when you need to calculate the error ratio of the calculated path compared with the exact path in the experiment. In addition, when you run the terrain data with dataset size more than 20000, we strongly encourage you to set [calculate_FixSP] to 0. Otherwise, it will take a very long time to run algorithm FixSP (because algorithm FixSP performs very bad when terrain data is large).
 
 An example:
 
@@ -106,7 +106,7 @@ An example:
 ./main EP_small.off 0.5 0.5 0 1
 ```
 
-In this example, EP_small.off is the terrain data file, epsilon_SP is 0.5, epsilon_SL is 0.5, exact path will not be calculated (and the distance error compared with the exact path and the calculated path will be infinity), and algorithm FSP will be included (thus, it will run six algorithms, i.e., algorithm FSP, algorithm LSP, algorithm FSP-BSSL, algorithm FSP-EWSL, algorithm DLSP-BSSL and algorithm DLSP-EWSL).
+In this example, EP_small.off is the terrain data file, epsilon_SP is 0.5, epsilon_SL is 0.5, exact path will not be calculated (and the distance error compared with the exact path and the calculated path will be infinity), and algorithm FixSP will be included (thus, it will run six algorithms, i.e., algorithm FixSP, algorithm LogSP, algorithm FixSP-BinarySearch, algorithm FixSP-EffWeight, algorithm ProgLogSP-BinarySearch and algorithm ProgLogSP-EffWeight).
 
 ## Output
 

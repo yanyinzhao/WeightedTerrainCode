@@ -10,7 +10,7 @@ int main(int argc, char **argv)
 {
 	if (argc < 6)
 	{
-		std::cout << "run: ./main [terrain_data] [epsilon_SP] [epsilon_SL] [calculate_exact_path] [calculate_FSP]" << std::endl;
+		std::cout << "run: ./main [terrain_data] [epsilon_SP] [epsilon_SL] [calculate_exact_path] [calculate_FixSP]" << std::endl;
 		return 0;
 	}
 
@@ -18,7 +18,7 @@ int main(int argc, char **argv)
 	double Steiner_point_epsilon = std::stod(argv[2]);
 	double snell_law_epsilon = std::stod(argv[3]);
 	int calculate_exact_path = std::stoi(argv[4]); // 1 for calculate exact path, 0 for not calculate exact path
-	int calculate_FSP = std::stoi(argv[5]);		   // 1 for calculate FSP, 0 for not calculate FSP
+	int calculate_FixSP = std::stoi(argv[5]);	   // 1 for calculate FixSP, 0 for not calculate FixSP
 
 	std::vector<double> points;
 	std::vector<unsigned> faces;
@@ -150,7 +150,7 @@ int main(int argc, char **argv)
 	assert(Steiner_point_epsilon > 0 && Steiner_point_epsilon <= 1);
 	assert(snell_law_epsilon > 0 && snell_law_epsilon <= 1);
 	assert(calculate_exact_path == 0 || calculate_exact_path == 1);
-	assert(calculate_FSP == 0 || calculate_FSP == 1);
+	assert(calculate_FixSP == 0 || calculate_FixSP == 1);
 
 	std::string write_file_header = input_dataset + "\t" +
 									std::to_string(mesh.faces().size()) + "\t" +
@@ -164,7 +164,7 @@ int main(int argc, char **argv)
 
 	// simulating the path length
 	int estimate_path_length;
-	if (!(calculate_exact_path == 0 && calculate_FSP == 0))
+	if (!(calculate_exact_path == 0 && calculate_FixSP == 0))
 	{
 		geodesic::GeodesicAlgorithmSubdivision algorithm_path_length(&mesh, 10);
 		algorithm_path_length.geodesic(source, destination, path_length_result_path);
@@ -181,33 +181,33 @@ int main(int argc, char **argv)
 				  << std::endl;
 	}
 
-	if (calculate_FSP == 1)
+	if (calculate_FixSP == 1)
 	{
 
-		std::cout << "== FSP ==" << std::endl;
+		std::cout << "== FixSP ==" << std::endl;
 		fixed_Steiner_point_with_exp_output(&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, estimate_path_length, exact_result_path_distance, fixed_Steiner_point_result_path);
 		std::cout << std::endl;
 
-		std::cout << "== FSP-BSSL ==" << std::endl;
+		std::cout << "== FixSP-BinarySearch ==" << std::endl;
 		fixed_Steiner_point_and_binary_search_snell_law(&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, estimate_path_length, snell_law_epsilon, exact_result_path_distance, fixed_Steiner_point_and_binary_search_snell_law_result_path);
 		std::cout << std::endl;
 
-		std::cout << "== FSP-EWSL ==" << std::endl;
+		std::cout << "== FixSP-EffWeight ==" << std::endl;
 		fixed_Steiner_point_and_effective_weight_snell_law(&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, estimate_path_length, snell_law_epsilon, exact_result_path_distance, fixed_Steiner_point_and_effective_weight_snell_law_result_path);
 		std::cout << std::endl;
 	}
 
-	std::cout << "== LSP ==" << std::endl;
+	std::cout << "== LogSP ==" << std::endl;
 	log_Steiner_point_with_exp_output(&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, exact_result_path_distance, log_Steiner_point_result_path);
 	std::cout << std::endl;
 
-	std::cout << "== DLSP-BSSL ==" << std::endl;
+	std::cout << "== ProgLogSP-BinarySearch ==" << std::endl;
 	log_Steiner_point_divide_and_conquer_and_binary_search_snell_law(&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, snell_law_epsilon,
 																	 max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint, exact_result_path_distance,
 																	 log_Steiner_point_divide_and_conquer_and_binary_search_snell_law_result_path);
 	std::cout << std::endl;
 
-	std::cout << "== DLSP-EWSL ==" << std::endl;
+	std::cout << "== ProgLogSP-EffWeight ==" << std::endl;
 	log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, snell_law_epsilon,
 																		max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint, exact_result_path_distance,
 																		log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law_result_path);
