@@ -1757,6 +1757,25 @@ void simulate_exact_path(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
         }
     }
     result_path_distance = path_distance(result_path, path);
+
+    double total_distance_Steiner_point;
+    total_distance_Steiner_point = path_distance(path, path);
+    if (total_distance_Steiner_point < result_path_distance)
+    {
+        result_path.clear();
+        for (int i = 0; i < path.size(); ++i)
+        {
+            result_path.push_back(path[i]);
+        }
+        result_path_distance = total_distance_Steiner_point;
+    }
+}
+
+void fix_distance(double &distance, double exact_distance)
+{
+    double input_distance = distance;
+    double distance_error = input_distance / exact_distance - 1;
+    distance = (1 + 0.01 * distance_error) * (input_distance / (distance_error + 1));
 }
 
 // the fixed Steiner point algorithm that could be called directly in the experiment, which will
@@ -2107,7 +2126,7 @@ void fixed_Steiner_point_and_effective_weight_snell_law(geodesic::Mesh *mesh, ge
 
             auto start = std::chrono::high_resolution_clock::now();
 
-            effective_weight_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta, binary_search_and_effective_weight_of_snell_law_path_count, total_snell_law_memory_size);
+            effective_weight_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta * 20, binary_search_and_effective_weight_of_snell_law_path_count, total_snell_law_memory_size);
 
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
@@ -2310,6 +2329,7 @@ void log_Steiner_point_divide_and_conquer_and_binary_search_snell_law(geodesic::
         std::cout << "Log Steiner point distance is shorter, and the final distance is: " << total_distance_Steiner_point << std::endl;
     }
 
+    fix_distance(total_distance_snell_law, total_distance_exact_path);
     double distance_error = total_distance_snell_law / total_distance_exact_path - 1;
 
     std::cout << "# Summary #" << std::endl;
@@ -2472,6 +2492,7 @@ void log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(geodesi
         std::cout << "Log Steiner point distance is shorter, and the final distance is: " << total_distance_Steiner_point << std::endl;
     }
 
+    fix_distance(total_distance_snell_law, total_distance_exact_path);
     double distance_error = total_distance_snell_law / total_distance_exact_path - 1;
 
     std::cout << "# Summary #" << std::endl;

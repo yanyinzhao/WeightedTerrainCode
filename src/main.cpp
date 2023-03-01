@@ -177,6 +177,7 @@ int main(int argc, char **argv)
 	{
 		std::cout << "\n== Start simulating the exact path ==" << std::endl;
 		simulate_exact_path(&mesh, source, destination, path, 0.05, estimate_path_length, 0.05, exact_result_path, exact_result_path_distance);
+		std::cout << "exact_result_path_distance:" << exact_result_path_distance << std::endl;
 		std::cout << "== Finished simulating the exact path ==\n"
 				  << std::endl;
 	}
