@@ -926,7 +926,8 @@ bool snell_law_given_edge_intersection_point(
     double first_intersection_point_z,
     std::vector<geodesic::SurfacePoint> &snell_law_path,
     int &exit_edge_index, // the snell law path pass edge_sequence[exit_edge_index], but not pass edge_sequence[exit_edge_index - 1], i.e. the next edge
-    int &return_out_at_critical_angle)
+    int &return_out_at_critical_angle,
+    int segment_path_length)
 {
     geodesic::Edge *first_edge;
     first_edge = &edge_sequence[edge_sequence.size() - 1]; // calculate the first edge that is just opposite of the source
@@ -964,18 +965,23 @@ bool snell_law_given_edge_intersection_point(
 
     for (int i = edge_sequence.size() - 1; i >= 0; --i)
     {
-        for (int j = 0; j < mesh->vertices().size(); ++j)
+        int iteration = 0;
+        if (mesh->vertices().size() < 4000)
+        {
+            iteration = 100;
+        }
+        else if (mesh->vertices().size() < 100000)
+        {
+            iteration = 500;
+        }
+        else
+        {
+            iteration = 10000;
+        }
+        for (int j = 0; j < iteration * segment_path_length; ++j)
         {
             double face_1_weight = face_sequence[i + 1].weight();
             double face_2_weight = face_sequence[i].weight();
-
-            if (mesh->vertices()[j].x() == source_x && mesh->vertices()[j].x() == incident_point_x &&
-                mesh->vertices()[j].y() == source_y && mesh->vertices()[j].y() == incident_point_y &&
-                mesh->vertices()[j].z() == source_z && mesh->vertices()[j].z() == incident_point_z)
-            {
-                std::cout << "Error! The source and incident point are both on the same vertex of the mesh!" << std::endl;
-                exit(0);
-            }
 
             calculate_out_ray(face_1_weight, face_2_weight, source_x, source_y, source_z,
                               edge_sequence[i].adjacent_vertices()[0]->x(),
@@ -1074,9 +1080,9 @@ void baseline_binary_search_one_time_of_one_edge(geodesic::Mesh *mesh,
                                                  double &next_source_y,
                                                  double &next_source_z,
                                                  int &binary_search_of_snell_law_path_count_return,
-                                                 double &snell_law_memory_size)
+                                                 double &snell_law_memory_size,
+                                                 int segment_path_length)
 {
-
     geodesic::Edge *first_edge;
     first_edge = &edge_sequence[edge_sequence.size() - 1]; // calculate the first edge that is just opposite of the source
 
@@ -1158,7 +1164,7 @@ void baseline_binary_search_one_time_of_one_edge(geodesic::Mesh *mesh,
         auto start = std::chrono::high_resolution_clock::now();
 
         snell_law_path_inside_edge_region = snell_law_given_edge_intersection_point(
-            mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, curr_edge_intersection_point_x, curr_edge_intersection_point_y, curr_edge_intersection_point_z, snell_law_path, exit_edge_index, out_at_critical_angle);
+            mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, curr_edge_intersection_point_x, curr_edge_intersection_point_y, curr_edge_intersection_point_z, snell_law_path, exit_edge_index, out_at_critical_angle, segment_path_length);
 
         auto stop = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
@@ -1459,7 +1465,6 @@ void baseline_binary_search_one_time_of_one_edge(geodesic::Mesh *mesh,
     next_source_y = curr_edge_intersection_point_factor * curr_edge_vector_y + curr_edge_start_vertex_y;
     next_source_z = curr_edge_intersection_point_factor * curr_edge_vector_z + curr_edge_start_vertex_z;
 
-    std::cout << "binary search of using snell law path count: " << binary_search_of_snell_law_path_count << std::endl;
     binary_search_of_snell_law_path_count_return = binary_search_of_snell_law_path_count;
 }
 
@@ -1471,7 +1476,8 @@ void baseline_binary_search_multiple_times_of_each_edge(geodesic::Mesh *mesh,
                                                         std::vector<geodesic::SurfacePoint> &result_path,
                                                         double delta,
                                                         int &total_binary_search_of_snell_law_path_count,
-                                                        double &total_snell_law_memory_size)
+                                                        double &total_snell_law_memory_size,
+                                                        int segment_path_length)
 {
     double source_x = source.x();
     double source_y = source.y();
@@ -1491,7 +1497,7 @@ void baseline_binary_search_multiple_times_of_each_edge(geodesic::Mesh *mesh,
         snell_law_path.clear();
         snell_law_path_point->set(source_x, source_y, source_z);
         result_path.push_back(geodesic::SurfacePoint(snell_law_path_point));
-        baseline_binary_search_one_time_of_one_edge(mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, snell_law_path, delta, next_source_x, next_source_y, next_source_z, binary_search_of_snell_law_path_count, snell_law_memory_size);
+        baseline_binary_search_one_time_of_one_edge(mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, snell_law_path, delta, next_source_x, next_source_y, next_source_z, binary_search_of_snell_law_path_count, snell_law_memory_size, segment_path_length);
         total_binary_search_of_snell_law_path_count += binary_search_of_snell_law_path_count;
         total_snell_law_memory_size += snell_law_memory_size;
         edge_sequence.pop_back();
@@ -1522,7 +1528,8 @@ void effective_weight_binary_search_one_time_one_ray_of_one_edge(geodesic::Mesh 
                                                                  double &next_source_y,
                                                                  double &next_source_z,
                                                                  int &binary_search_and_effective_weight_of_snell_law_path_count_return,
-                                                                 double &snell_law_memory_size)
+                                                                 double &snell_law_memory_size,
+                                                                 int segment_path_length)
 {
 
     geodesic::Edge *first_edge;
@@ -1635,7 +1642,7 @@ void effective_weight_binary_search_one_time_one_ray_of_one_edge(geodesic::Mesh 
             auto start = std::chrono::high_resolution_clock::now();
 
             snell_law_path_inside_edge_region = snell_law_given_edge_intersection_point(
-                mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, curr_edge_intersection_point_x, curr_edge_intersection_point_y, curr_edge_intersection_point_z, snell_law_path, exit_edge_index, out_at_critical_angle);
+                mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, curr_edge_intersection_point_x, curr_edge_intersection_point_y, curr_edge_intersection_point_z, snell_law_path, exit_edge_index, out_at_critical_angle, segment_path_length);
 
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
@@ -2081,7 +2088,7 @@ void effective_weight_binary_search_one_time_one_ray_of_one_edge(geodesic::Mesh 
             auto start = std::chrono::high_resolution_clock::now();
 
             snell_law_path_inside_edge_region = snell_law_given_edge_intersection_point(
-                mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, curr_edge_intersection_point_x, curr_edge_intersection_point_y, curr_edge_intersection_point_z, snell_law_path, exit_edge_index, out_at_critical_angle);
+                mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, curr_edge_intersection_point_x, curr_edge_intersection_point_y, curr_edge_intersection_point_z, snell_law_path, exit_edge_index, out_at_critical_angle, segment_path_length);
 
             snell_law_memory_size += snell_law_path.size() * sizeof(geodesic::SurfacePoint);
 
@@ -2449,7 +2456,7 @@ void effective_weight_binary_search_one_time_one_ray_of_one_edge(geodesic::Mesh 
                 effective_weight_of_snell_law_path_count++;
 
                 snell_law_path_inside_edge_region_list.push_back(snell_law_given_edge_intersection_point(
-                    mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, curr_edge_intersection_point_x_list[i], curr_edge_intersection_point_y_list[i], curr_edge_intersection_point_z_list[i], snell_law_path, exit_edge_index, out_at_critical_angle));
+                    mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, curr_edge_intersection_point_x_list[i], curr_edge_intersection_point_y_list[i], curr_edge_intersection_point_z_list[i], snell_law_path, exit_edge_index, out_at_critical_angle, segment_path_length));
 
                 snell_law_memory_size += snell_law_path.size() * sizeof(geodesic::SurfacePoint);
 
@@ -2762,7 +2769,6 @@ void effective_weight_binary_search_one_time_one_ray_of_one_edge(geodesic::Mesh 
     next_source_y = curr_edge_intersection_point_factor * curr_edge_vector_y + curr_edge_start_vertex_y;
     next_source_z = curr_edge_intersection_point_factor * curr_edge_vector_z + curr_edge_start_vertex_z;
 
-    std::cout << "binary search and effective weight of using snell law path count: " << binary_search_of_snell_law_path_count + effective_weight_of_snell_law_path_count << std::endl;
     binary_search_and_effective_weight_of_snell_law_path_count_return = binary_search_of_snell_law_path_count + effective_weight_of_snell_law_path_count;
 }
 
@@ -2774,7 +2780,8 @@ void effective_weight_binary_search_multiple_times_of_each_edge(geodesic::Mesh *
                                                                 std::vector<geodesic::SurfacePoint> &result_path,
                                                                 double delta,
                                                                 int &total_binary_search_and_effective_weight_of_snell_law_path_count,
-                                                                double &total_snell_law_memory_size)
+                                                                double &total_snell_law_memory_size,
+                                                                int segment_path_length)
 {
     // the first num_of_edges_using_effective_weight edges use effective weight (and also binary search)
     // the remaining edges only use binary search
@@ -2800,7 +2807,7 @@ void effective_weight_binary_search_multiple_times_of_each_edge(geodesic::Mesh *
             snell_law_path.clear();
             snell_law_path_point->set(source_x, source_y, source_z);
             result_path.push_back(geodesic::SurfacePoint(snell_law_path_point));
-            effective_weight_binary_search_one_time_one_ray_of_one_edge(mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, snell_law_path, delta, next_source_x, next_source_y, next_source_z, binary_search_and_effective_weight_of_snell_law_path_count, snell_law_memory_size);
+            effective_weight_binary_search_one_time_one_ray_of_one_edge(mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, snell_law_path, delta, next_source_x, next_source_y, next_source_z, binary_search_and_effective_weight_of_snell_law_path_count, snell_law_memory_size, segment_path_length);
             total_binary_search_and_effective_weight_of_snell_law_path_count += binary_search_and_effective_weight_of_snell_law_path_count;
             total_snell_law_memory_size += snell_law_memory_size;
             edge_sequence.pop_back();
@@ -2816,7 +2823,7 @@ void effective_weight_binary_search_multiple_times_of_each_edge(geodesic::Mesh *
             snell_law_path.clear();
             snell_law_path_point->set(source_x, source_y, source_z);
             result_path.push_back(geodesic::SurfacePoint(snell_law_path_point));
-            baseline_binary_search_one_time_of_one_edge(mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, snell_law_path, delta, next_source_x, next_source_y, next_source_z, binary_search_and_effective_weight_of_snell_law_path_count, snell_law_memory_size);
+            baseline_binary_search_one_time_of_one_edge(mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, snell_law_path, delta, next_source_x, next_source_y, next_source_z, binary_search_and_effective_weight_of_snell_law_path_count, snell_law_memory_size, segment_path_length);
             total_binary_search_and_effective_weight_of_snell_law_path_count += binary_search_and_effective_weight_of_snell_law_path_count;
             total_snell_law_memory_size += snell_law_memory_size;
             edge_sequence.pop_back();
@@ -2835,7 +2842,7 @@ void effective_weight_binary_search_multiple_times_of_each_edge(geodesic::Mesh *
             snell_law_path.clear();
             snell_law_path_point->set(source_x, source_y, source_z);
             result_path.push_back(geodesic::SurfacePoint(snell_law_path_point));
-            effective_weight_binary_search_one_time_one_ray_of_one_edge(mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, snell_law_path, delta, next_source_x, next_source_y, next_source_z, binary_search_and_effective_weight_of_snell_law_path_count, snell_law_memory_size);
+            effective_weight_binary_search_one_time_one_ray_of_one_edge(mesh, edge_sequence, face_sequence, source_x, source_y, source_z, destination, snell_law_path, delta, next_source_x, next_source_y, next_source_z, binary_search_and_effective_weight_of_snell_law_path_count, snell_law_memory_size, segment_path_length);
             total_binary_search_and_effective_weight_of_snell_law_path_count += binary_search_and_effective_weight_of_snell_law_path_count;
             total_snell_law_memory_size += snell_law_memory_size;
             edge_sequence.pop_back();

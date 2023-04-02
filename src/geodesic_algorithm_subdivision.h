@@ -33,6 +33,7 @@ namespace geodesic
 		double &distance_from_source() { return m_distance; };
 		node_pointer &previous() { return m_previous; };
 		unsigned &source_index() { return m_source_index; };
+		int &node_id() { return m_id; };
 
 		void clear()
 		{
@@ -74,6 +75,7 @@ namespace geodesic
 		double m_distance;		 // distance to the closest source
 		unsigned m_source_index; // closest source index
 		node_pointer m_previous; // previous node in the geodesic path
+		int m_id;
 	};
 
 	class GeodesicAlgorithmSubdivision : public GeodesicAlgorithmGraphBase<SubdivisionNode>
@@ -82,7 +84,8 @@ namespace geodesic
 
 	public:
 		GeodesicAlgorithmSubdivision(geodesic::Mesh *mesh = NULL,
-									 unsigned subdivision_level = 0) : GeodesicAlgorithmGraphBase<Node>(mesh)
+									 unsigned subdivision_level = 0,
+									 int removing_value = 2) : GeodesicAlgorithmGraphBase<Node>(mesh)
 		{
 			m_type = SUBDIVISION;
 
@@ -92,9 +95,11 @@ namespace geodesic
 				vertex_pointer v = &mesh->vertices()[i];
 
 				m_nodes.push_back(Node(v)); //!!
+				m_nodes[m_nodes.size() - 1].node_id() = i;
 			}
 
 			set_subdivision_level(subdivision_level);
+			m_removing_value = removing_value;
 		};
 
 		~GeodesicAlgorithmSubdivision(){};
@@ -109,6 +114,7 @@ namespace geodesic
 			m_nodes.reserve(m_mesh->vertices().size() +
 							m_mesh->edges().size() * subdivision_level);
 
+			int node_index = m_mesh->vertices().size();
 			for (unsigned i = 0; i < m_mesh->edges().size(); ++i)
 			{
 				edge_pointer e = &m_mesh->edges()[i];
@@ -116,6 +122,8 @@ namespace geodesic
 				{
 					double offset = (double)(j + 1) / (double)(subdivision_level + 1);
 					m_nodes.push_back(Node(e, offset));
+					m_nodes[m_nodes.size() - 1].node_id() = node_index;
+					node_index++;
 				}
 			}
 		};
@@ -161,9 +169,10 @@ namespace geodesic
 		{
 			edge_pointer e = static_cast<edge_pointer>(p);
 			unsigned node_index = node_indexx(e);
-			for (unsigned i = 0; i < m_subdivision_level; ++i)
+			for (int i = 0; i < m_subdivision_level; i = i + 1 + m_removing_value)
 			{
-				node_pointer node = &m_nodes[node_index++];
+				node_pointer node = &m_nodes[node_index];
+				node_index = node_index + 1 + m_removing_value;
 				if (node->distance_from_source() > threshold_distance)
 				{
 					storage.push_back(node);

@@ -7,6 +7,7 @@
 #include "geodesic_constants_and_simple_functions.h"
 #include <iostream>
 #include <ctime>
+#include <unordered_map>
 
 namespace geodesic
 {
@@ -27,8 +28,14 @@ namespace geodesic
 		virtual ~GeodesicAlgorithmBase(){};
 
 		virtual void propagate(std::vector<SurfacePoint> &sources,
-							   double max_propagation_distance = GEODESIC_INF,						 // propagation algorithm stops after reaching the certain distance from the source
-							   std::vector<SurfacePoint> *stop_points = NULL, int k = 10000000) = 0; // or after ensuring that all the stop_points are covered
+							   double max_propagation_distance,
+							   std::vector<SurfacePoint> *stop_points,
+							   std::unordered_map<int, double> input_dist,
+							   std::unordered_map<int, int> input_prev_node,
+							   std::unordered_map<int, int> input_src_index,
+							   std::unordered_map<int, double> &output_dist,
+							   std::unordered_map<int, int> &output_prev_node,
+							   std::unordered_map<int, int> &output_src_index) = 0;
 
 		virtual void trace_back(SurfacePoint &destination, // trace back piecewise-linear path
 								std::vector<SurfacePoint> &path) = 0;
@@ -37,11 +44,13 @@ namespace geodesic
 
 		void geodesic(SurfacePoint &source,
 					  SurfacePoint &destination,
-					  std::vector<SurfacePoint> &path); // lazy people can find geodesic path with one function call
-
-		void geodesic(std::vector<SurfacePoint> &sources,
-					  std::vector<SurfacePoint> &destinations,
-					  std::vector<std::vector<SurfacePoint> > &paths); // lazy people can find geodesic paths with one function call
+					  std::vector<SurfacePoint> &path,
+					  std::unordered_map<int, double> input_dist,
+					  std::unordered_map<int, int> input_prev_node,
+					  std::unordered_map<int, int> input_src_index,
+					  std::unordered_map<int, double> &output_dist,
+					  std::unordered_map<int, int> &output_prev_node,
+					  std::unordered_map<int, int> &output_src_index); // lazy people can find geodesic path with one function call
 
 		double return_memory();
 
@@ -116,7 +125,13 @@ namespace geodesic
 	// now using this geodesic function
 	inline void GeodesicAlgorithmBase::geodesic(SurfacePoint &source,
 												SurfacePoint &destination,
-												std::vector<SurfacePoint> &path) // lazy people can find geodesic path with one function call
+												std::vector<SurfacePoint> &path,
+												std::unordered_map<int, double> input_dist,
+												std::unordered_map<int, int> input_prev_node,
+												std::unordered_map<int, int> input_src_index,
+												std::unordered_map<int, double> &output_dist,
+												std::unordered_map<int, int> &output_prev_node,
+												std::unordered_map<int, int> &output_src_index) // lazy people can find geodesic path with one function call
 	{
 		std::vector<SurfacePoint> sources(1, source);
 		std::vector<SurfacePoint> stop_points(1, destination);
@@ -124,7 +139,10 @@ namespace geodesic
 
 		propagate(sources,
 				  max_propagation_distance,
-				  &stop_points);
+				  &stop_points,
+				  input_dist, input_prev_node,
+				  input_src_index, output_dist,
+				  output_prev_node, output_src_index);
 
 		trace_back(destination, path);
 	}
@@ -132,24 +150,6 @@ namespace geodesic
 	inline double GeodesicAlgorithmBase::return_memory()
 	{
 		return get_memory();
-	}
-
-	inline void GeodesicAlgorithmBase::geodesic(std::vector<SurfacePoint> &sources,
-												std::vector<SurfacePoint> &destinations,
-												std::vector<std::vector<SurfacePoint> > &paths) // lazy people can find geodesic paths with one function call
-	{
-		double const max_propagation_distance = GEODESIC_INF;
-
-		propagate(sources,
-				  max_propagation_distance,
-				  &destinations); // we use desinations as stop points
-
-		paths.resize(destinations.size());
-
-		for (unsigned i = 0; i < paths.size(); ++i)
-		{
-			trace_back(destinations[i], paths[i]);
-		}
 	}
 
 	inline void GeodesicAlgorithmBase::set_stop_conditions(std::vector<SurfacePoint> *stop_points,

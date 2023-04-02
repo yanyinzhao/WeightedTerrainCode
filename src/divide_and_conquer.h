@@ -446,23 +446,34 @@ double path_distance(std::vector<geodesic::SurfacePoint> &path_for_distance, std
 void fixed_Steiner_point(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
                          geodesic::SurfacePoint &destination,
                          std::vector<geodesic::SurfacePoint> &path,
-                         double epsilon, int estimate_path_length,
+                         double epsilon, int removing_value,
+                         int estimate_path_length,
                          double &building_time, double &query_time,
-                         double &memory_size)
+                         double &memory_size,
+                         std::unordered_map<int, double> input_dist,
+                         std::unordered_map<int, int> input_prev_node,
+                         std::unordered_map<int, int> input_src_index,
+                         std::unordered_map<int, double> &output_dist,
+                         std::unordered_map<int, int> &output_prev_node,
+                         std::unordered_map<int, int> &output_src_index)
 {
     unsigned subdivision_level;
     fixed_Steiner_point_epsilon_to_subdivision_level(mesh, epsilon, estimate_path_length, subdivision_level);
     std::cout << "Original subdivision level: " << subdivision_level << std::endl;
 
     auto start_building_time = std::chrono::high_resolution_clock::now();
-    geodesic::GeodesicAlgorithmSubdivision algorithm(mesh, subdivision_level);
+    geodesic::GeodesicAlgorithmSubdivision algorithm(mesh, subdivision_level, removing_value);
     auto stop_building_time = std::chrono::high_resolution_clock::now();
     auto duration_building_time = std::chrono::duration_cast<std::chrono::milliseconds>(stop_building_time - start_building_time);
     building_time = duration_building_time.count();
 
     auto start_query_time = std::chrono::high_resolution_clock::now();
-    algorithm.geodesic(source, destination, path);
+    algorithm.geodesic(source, destination, path, input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
     memory_size = algorithm.get_memory();
+    if (input_dist.size() != 0)
+    {
+        memory_size = memory_size - memory_size / (removing_value + 1);
+    }
     int path_length = path.size();
     for (int i = 1; i < path_length - 1; ++i)
     {
@@ -539,8 +550,14 @@ void fixed_Steiner_point(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
 void log_Steiner_point(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
                        geodesic::SurfacePoint &destination,
                        std::vector<geodesic::SurfacePoint> &path,
-                       double epsilon, double &building_time,
-                       double &query_time, double &memory_size)
+                       double epsilon, int removing_value, double &building_time,
+                       double &query_time, double &memory_size,
+                       std::unordered_map<int, double> input_dist,
+                       std::unordered_map<int, int> input_prev_node,
+                       std::unordered_map<int, int> input_src_index,
+                       std::unordered_map<int, double> &output_dist,
+                       std::unordered_map<int, int> &output_prev_node,
+                       std::unordered_map<int, int> &output_src_index)
 {
     unsigned max_subdivision_log_level;
     double delta;
@@ -549,14 +566,18 @@ void log_Steiner_point(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
     std::cout << "Original max subdivision log level: " << 2 * max_subdivision_log_level << std::endl;
 
     auto start_building_time = std::chrono::high_resolution_clock::now();
-    geodesic::GeodesicAlgorithmSubdivisionLog algorithm(mesh, max_subdivision_log_level, delta, r);
+    geodesic::GeodesicAlgorithmSubdivisionLog algorithm(mesh, max_subdivision_log_level, removing_value, delta, r);
     auto stop_building_time = std::chrono::high_resolution_clock::now();
     auto duration_building_time = std::chrono::duration_cast<std::chrono::milliseconds>(stop_building_time - start_building_time);
     building_time = duration_building_time.count();
 
     auto start_query_time = std::chrono::high_resolution_clock::now();
-    algorithm.geodesic(source, destination, path);
+    algorithm.geodesic(source, destination, path, input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
     memory_size = algorithm.get_memory();
+    if (input_dist.size() != 0)
+    {
+        memory_size = memory_size - memory_size / (removing_value + 1);
+    }
     int path_length = path.size();
     for (int i = 1; i < path_length - 1; ++i)
     {
@@ -629,17 +650,1001 @@ void log_Steiner_point(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
     std::cout << "Log Steiner point distance: " << total_distance << std::endl;
 }
 
+// cannot call this function directly, need to call fixed_Steiner_point_divide_and_conquer_helper
+void fixed_Steiner_point_divide_and_conquer(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
+                                            geodesic::SurfacePoint &destination,
+                                            std::vector<geodesic::SurfacePoint> &path,
+                                            unsigned subdivision_level, int removing_value,
+                                            unsigned max_divide_and_conquer_subdivision_level,
+                                            int max_loop_num_for_single_endpoint,
+                                            double &total_building_time, double &total_Steiner_point_memory_size,
+                                            std::unordered_map<int, double> input_dist,
+                                            std::unordered_map<int, int> input_prev_node,
+                                            std::unordered_map<int, int> input_src_index,
+                                            std::unordered_map<int, double> &output_dist,
+                                            std::unordered_map<int, int> &output_prev_node,
+                                            std::unordered_map<int, int> &output_src_index)
+{
+    auto start_building_time = std::chrono::high_resolution_clock::now();
+    geodesic::GeodesicAlgorithmSubdivision algorithm(mesh, subdivision_level, removing_value);
+    auto stop_building_time = std::chrono::high_resolution_clock::now();
+    auto duration_building_time = std::chrono::duration_cast<std::chrono::milliseconds>(stop_building_time - start_building_time);
+    total_building_time += duration_building_time.count();
+
+    std::cout << "divide and conquer subdivision level: " << subdivision_level << std::endl;
+
+    geodesic::SurfacePoint successive_points_previous_vertex;
+    int successive_points_count = 0;
+
+    algorithm.geodesic(source, destination, path, input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
+    total_Steiner_point_memory_size += algorithm.return_memory();
+
+    // follow the direction from destination to source (backward):
+    // Sometimes, it could happen that the previous point, current point and next point are on the same edge
+    // so we need to delete the current point
+    int path_length = path.size();
+    for (int i = 1; i < path_length - 1; ++i)
+    {
+        geodesic::SurfacePoint &prev = path[i - 1];
+        geodesic::SurfacePoint &curr = path[i];
+        geodesic::SurfacePoint &next = path[i + 1];
+        if ((prev.type() == geodesic::EDGE && curr.type() == geodesic::EDGE && next.type() == geodesic::EDGE &&
+             prev.base_element()->id() == curr.base_element()->id() && next.base_element()->id() == curr.base_element()->id()) ||
+            (prev.type() == geodesic::EDGE && curr.type() == geodesic::EDGE && next.type() == geodesic::VERTEX &&
+             next.base_element()->id() == curr.base_element()->adjacent_vertices()[0]->id() && prev.base_element()->id() == curr.base_element()->id()) ||
+            (prev.type() == geodesic::EDGE && curr.type() == geodesic::EDGE && next.type() == geodesic::VERTEX &&
+             next.base_element()->id() == curr.base_element()->adjacent_vertices()[1]->id() && prev.base_element()->id() == curr.base_element()->id()) ||
+            (prev.type() == geodesic::VERTEX && curr.type() == geodesic::EDGE && next.type() == geodesic::EDGE &&
+             prev.base_element()->id() == curr.base_element()->adjacent_vertices()[0]->id() && next.base_element()->id() == curr.base_element()->id()) ||
+            (prev.type() == geodesic::VERTEX && curr.type() == geodesic::EDGE && next.type() == geodesic::EDGE &&
+             prev.base_element()->id() == curr.base_element()->adjacent_vertices()[1]->id() && next.base_element()->id() == curr.base_element()->id()) ||
+            (prev.type() == geodesic::VERTEX && curr.type() == geodesic::EDGE && next.type() == geodesic::VERTEX &&
+             prev.base_element()->id() == curr.base_element()->adjacent_vertices()[0]->id() && next.base_element()->id() == curr.base_element()->adjacent_vertices()[1]->id()) ||
+            (prev.type() == geodesic::VERTEX && curr.type() == geodesic::EDGE && next.type() == geodesic::VERTEX &&
+             prev.base_element()->id() == curr.base_element()->adjacent_vertices()[1]->id() && next.base_element()->id() == curr.base_element()->adjacent_vertices()[0]->id()))
+        {
+            path.erase(path.begin() + i);
+            path_length--;
+            i--;
+        }
+    }
+
+    // follow the direction from destination to source (backward):
+    // Sometimes, it could happen that the current point is on the edge, and the previous point or the next point is one of the vertex of this edge
+    // so we need to delete the current point
+    for (int i = 1; i < path_length - 1; ++i)
+    {
+        geodesic::SurfacePoint &prev = path[i - 1];
+        geodesic::SurfacePoint &curr = path[i];
+        geodesic::SurfacePoint &next = path[i + 1];
+        if ((prev.type() == geodesic::VERTEX && curr.type() == geodesic::EDGE && curr.base_element()->adjacent_vertices()[0]->id() == prev.base_element()->id()) ||
+            (prev.type() == geodesic::VERTEX && curr.type() == geodesic::EDGE && curr.base_element()->adjacent_vertices()[1]->id() == prev.base_element()->id()) ||
+            (next.type() == geodesic::VERTEX && curr.type() == geodesic::EDGE && curr.base_element()->adjacent_vertices()[0]->id() == next.base_element()->id()) ||
+            (next.type() == geodesic::VERTEX && curr.type() == geodesic::EDGE && curr.base_element()->adjacent_vertices()[1]->id() == next.base_element()->id()))
+        {
+            path.erase(path.begin() + i);
+            path_length--;
+            i--;
+        }
+    }
+
+    // follow the direction from destination to source (backward):
+    // Sometimes, it could happen that the current point and next point are on the same edge
+    // so we need to delete the next point
+    for (int i = 0; i < path_length - 1; ++i)
+    {
+        geodesic::SurfacePoint &curr = path[i];
+        geodesic::SurfacePoint &next = path[i + 1];
+        if (curr.type() == geodesic::EDGE && next.type() == geodesic::EDGE &&
+            curr.base_element()->id() == next.base_element()->id())
+        {
+            path.erase(path.begin() + i);
+            path_length--;
+            i--;
+        }
+    }
+
+    if (subdivision_level >= max_divide_and_conquer_subdivision_level)
+    {
+        return;
+    }
+
+    for (unsigned i = 0; i < path.size(); ++i)
+    {
+        geodesic::SurfacePoint &s = path[i];
+    }
+
+    path_length = path.size();
+    int fixed_path_length = path.size();
+    int original_counter = 1;
+
+    for (int i = 1; i < path_length - 1; ++i)
+    {
+        geodesic::SurfacePoint &s = path[i];
+
+        if (s.type() == geodesic::EDGE)
+        {
+            ++original_counter;
+            continue;
+        }
+
+        assert(s.type() == geodesic::VERTEX);
+
+        // successive point
+
+        // follow the direction from destination to source (backward):
+        // if the previous point is on the edge, the next point is on the vertex, and the current point is not the neighbour of source point or destination point
+        // or if the next point is on the vertex and the current point is next to the destination point
+        // we store the previous vertex for further refinement and delete current vertex
+        if ((path[i - 1].type() == geodesic::EDGE && path[i + 1].type() == geodesic::VERTEX && original_counter != 1 && original_counter != fixed_path_length - 2) ||
+            (original_counter == 1 && path[i + 1].type() == geodesic::VERTEX))
+        {
+            successive_points_previous_vertex = path[i - 1];
+            ++successive_points_count;
+        }
+
+        // follow the direction from destination to source (backward):
+        // if previous point and the next point are on the vertex, and the current point is not the neighbour of source point or destination point
+        // we delete current vertex
+        else if (path[i - 1].type() == geodesic::VERTEX && path[i + 1].type() == geodesic::VERTEX && original_counter != 1 && original_counter != fixed_path_length - 2)
+        {
+            ++successive_points_count;
+        }
+
+        // follow the direction from destination to source (backward):
+        // if the previous point is on the vertex, the next point is on the edge, and the current point is not the neighbour of source point or destination point
+        // or if the previous point is on the vertex and the current point is next to the source point
+        // we will use divide and conquer to refinement
+        else if ((path[i - 1].type() == geodesic::VERTEX && path[i + 1].type() == geodesic::EDGE && original_counter != 1 && original_counter != fixed_path_length - 2) ||
+                 (original_counter == fixed_path_length - 2 && path[i - 1].type() == geodesic::VERTEX))
+        {
+            if (successive_points_count > fixed_path_length / 4)
+            {
+                for (int j = 0; j <= successive_points_count; ++j)
+                {
+                    path.erase(path.begin() + i);
+                    i--;
+                    path_length--;
+                }
+
+                successive_points_count = 0;
+
+                std::vector<geodesic::SurfacePoint> sub_path;
+                sub_path.clear();
+                std::unordered_map<int, double> input_dist2;
+                std::unordered_map<int, int> input_prev_node2;
+                std::unordered_map<int, int> input_src_index2;
+                std::unordered_map<int, double> output_dist2;
+                std::unordered_map<int, int> output_prev_node2;
+                std::unordered_map<int, int> output_src_index2;
+                input_dist2.clear();
+                input_prev_node2.clear();
+                input_src_index2.clear();
+                output_dist2.clear();
+                output_prev_node2.clear();
+                output_src_index2.clear();
+                fixed_Steiner_point_divide_and_conquer(
+                    mesh, path[i + 1], successive_points_previous_vertex, sub_path, 2 * subdivision_level + 1, 0,
+                    max_divide_and_conquer_subdivision_level, max_loop_num_for_single_endpoint, total_building_time, total_Steiner_point_memory_size,
+                    input_dist2, input_prev_node2, input_src_index2, output_dist2, output_prev_node2, output_src_index2);
+
+                for (int j = sub_path.size() - 2; j >= 1; --j)
+                {
+                    path.insert(path.begin() + i + 1, sub_path[j]);
+                }
+                i += sub_path.size() - 2;
+                path_length += sub_path.size() - 2;
+            }
+            else
+            {
+                successive_points_count = 0;
+            }
+        }
+
+        // *******
+        // follow the direction from destination to source (backward):
+        // if the point is not connect to the source or destination point of the path
+        // or if the point is connect to the destination point (calculated using the divide-and-conquer algorithm) of the sub-path
+        // or if the point is connect to the source point (calculated using the divide-and-conquer algorithm) of the sub-path
+        // *******
+        else if ((path[i - 1].type() == geodesic::EDGE && path[i + 1].type() == geodesic::EDGE && original_counter != 1 && original_counter != fixed_path_length - 2) ||
+                 (original_counter == 1 && path[i + 1].type() == geodesic::EDGE && path[i - 1].type() == geodesic::EDGE) ||
+                 (original_counter == fixed_path_length - 2 && path[i - 1].type() == geodesic::EDGE && path[i + 1].type() == geodesic::EDGE))
+        {
+            // store the path distance for the new Steiner point on two sides of the original vertex
+            // also store the path distance for the original vertex
+            double new_steiner_point_one_side_distance;
+            double new_steiner_point_another_side_distance;
+            double original_vertex_distance;
+            int loop_count = 0;
+
+            do
+            {
+                new_steiner_point_one_side_distance = 0;
+                new_steiner_point_another_side_distance = 0;
+                original_vertex_distance = 0;
+
+                std::vector<geodesic::edge_pointer> edges_opposite_to_current;
+                edges_opposite_to_current.clear();
+
+                for (unsigned j = 0; j < s.base_element()->adjacent_faces().size(); ++j)
+                {
+                    geodesic::face_pointer f = s.base_element()->adjacent_faces()[j];
+
+                    // we will not include the two edges that the previous and next Steiner point lies on
+                    if (f->opposite_edge(static_cast<geodesic::vertex_pointer>(s.base_element()))->id() == path[i + 1].base_element()->id() ||
+                        f->opposite_edge(static_cast<geodesic::vertex_pointer>(s.base_element()))->id() == path[i - 1].base_element()->id())
+                    {
+                        continue;
+                    }
+                    edges_opposite_to_current.push_back(f->opposite_edge(static_cast<geodesic::vertex_pointer>(s.base_element())));
+                }
+
+                // store the vertices on one side (no matter left or right, both are okay) of the calculated path
+                std::vector<unsigned> one_side_vertices_id;
+
+                one_side_vertices_id.clear();
+
+                geodesic::vertex_pointer current_neighbor_1 = path[i + 1].base_element()->adjacent_vertices()[0];
+
+                one_side_vertices_id.push_back(current_neighbor_1->id());
+
+                std::vector<unsigned> already_added_edge_index_1;
+                do
+                {
+                    for (unsigned j = 0; j < edges_opposite_to_current.size(); ++j)
+                    {
+                        if (std::find(already_added_edge_index_1.begin(), already_added_edge_index_1.end(), j) != already_added_edge_index_1.end())
+                        {
+                            continue;
+                        }
+                        if (current_neighbor_1->id() == edges_opposite_to_current[j]->adjacent_vertices()[0]->id())
+                        {
+                            current_neighbor_1 = edges_opposite_to_current[j]->adjacent_vertices()[1];
+                            one_side_vertices_id.push_back(current_neighbor_1->id());
+                            already_added_edge_index_1.push_back(j);
+                            break;
+                        }
+                        else if (current_neighbor_1->id() == edges_opposite_to_current[j]->adjacent_vertices()[1]->id())
+                        {
+                            current_neighbor_1 = edges_opposite_to_current[j]->adjacent_vertices()[0];
+                            one_side_vertices_id.push_back(current_neighbor_1->id());
+                            already_added_edge_index_1.push_back(j);
+                            break;
+                        }
+                    }
+                } while (!(std::find(one_side_vertices_id.begin(), one_side_vertices_id.end(), path[i - 1].base_element()->adjacent_vertices()[0]->id()) != one_side_vertices_id.end()) &&
+                         !(std::find(one_side_vertices_id.begin(), one_side_vertices_id.end(), path[i - 1].base_element()->adjacent_vertices()[1]->id()) != one_side_vertices_id.end()));
+
+                // store the vertices on another side (no matter left or right, both are okay) of the calculated path
+                std::vector<unsigned> another_side_vertices_id;
+                another_side_vertices_id.clear();
+
+                geodesic::vertex_pointer current_neighbor_2 = path[i + 1].base_element()->adjacent_vertices()[1];
+
+                another_side_vertices_id.push_back(current_neighbor_2->id());
+
+                std::vector<unsigned> already_added_edge_index_2;
+                do
+                {
+                    for (unsigned j = 0; j < edges_opposite_to_current.size(); ++j)
+                    {
+                        if (std::find(already_added_edge_index_2.begin(), already_added_edge_index_2.end(), j) != already_added_edge_index_2.end())
+                        {
+                            continue;
+                        }
+                        if (current_neighbor_2->id() == edges_opposite_to_current[j]->adjacent_vertices()[0]->id())
+                        {
+                            current_neighbor_2 = edges_opposite_to_current[j]->adjacent_vertices()[1];
+                            another_side_vertices_id.push_back(current_neighbor_2->id());
+                            already_added_edge_index_2.push_back(j);
+                            break;
+                        }
+                        else if (current_neighbor_2->id() == edges_opposite_to_current[j]->adjacent_vertices()[1]->id())
+                        {
+                            current_neighbor_2 = edges_opposite_to_current[j]->adjacent_vertices()[0];
+                            another_side_vertices_id.push_back(current_neighbor_2->id());
+                            already_added_edge_index_2.push_back(j);
+                            break;
+                        }
+                    }
+                } while (!(std::find(another_side_vertices_id.begin(), another_side_vertices_id.end(), path[i - 1].base_element()->adjacent_vertices()[0]->id()) != another_side_vertices_id.end()) &&
+                         !(std::find(another_side_vertices_id.begin(), another_side_vertices_id.end(), path[i - 1].base_element()->adjacent_vertices()[1]->id()) != another_side_vertices_id.end()));
+
+                // store the edges on one side and another side (no matter left or right, both are okay) of the calculated path
+                std::vector<geodesic::edge_pointer> one_side_edges;
+                std::vector<geodesic::edge_pointer> another_side_edges;
+                one_side_edges.clear();
+                another_side_edges.clear();
+
+                for (unsigned j = 0; j < one_side_vertices_id.size(); ++j)
+                {
+                    for (unsigned k = 0; k < s.base_element()->adjacent_edges().size(); ++k)
+                    {
+                        geodesic::edge_pointer e = s.base_element()->adjacent_edges()[k];
+
+                        if (e->adjacent_vertices()[0]->id() == one_side_vertices_id[j] ||
+                            e->adjacent_vertices()[1]->id() == one_side_vertices_id[j])
+                        {
+                            one_side_edges.push_back(e);
+                            break;
+                        }
+                    }
+                }
+
+                for (unsigned j = 0; j < another_side_vertices_id.size(); ++j)
+                {
+                    for (unsigned k = 0; k < s.base_element()->adjacent_edges().size(); ++k)
+                    {
+                        geodesic::edge_pointer e = s.base_element()->adjacent_edges()[k];
+
+                        if (e->adjacent_vertices()[0]->id() == another_side_vertices_id[j] ||
+                            e->adjacent_vertices()[1]->id() == another_side_vertices_id[j])
+                        {
+                            another_side_edges.push_back(e);
+                            break;
+                        }
+                    }
+                }
+
+                std::vector<geodesic::SurfacePoint> new_steiner_point_one_side;
+                std::vector<geodesic::SurfacePoint> new_steiner_point_another_side;
+                new_steiner_point_one_side.clear();
+                new_steiner_point_another_side.clear();
+
+                double offset = 1 / ((double)(subdivision_level + 1) * pow(2, loop_count));
+
+                for (unsigned j = 0; j < one_side_edges.size(); ++j)
+                {
+                    if (one_side_edges[j]->adjacent_vertices()[0]->id() == s.base_element()->id())
+                    {
+                        new_steiner_point_one_side.push_back(geodesic::SurfacePoint(one_side_edges[j], offset));
+                    }
+                    else if (one_side_edges[j]->adjacent_vertices()[1]->id() == s.base_element()->id())
+                    {
+                        new_steiner_point_one_side.push_back(geodesic::SurfacePoint(one_side_edges[j], 1 - offset));
+                    }
+                }
+
+                for (unsigned j = 0; j < another_side_edges.size(); ++j)
+                {
+                    if (another_side_edges[j]->adjacent_vertices()[0]->id() == s.base_element()->id())
+                    {
+                        new_steiner_point_another_side.push_back(geodesic::SurfacePoint(another_side_edges[j], offset));
+                    }
+                    else if (another_side_edges[j]->adjacent_vertices()[1]->id() == s.base_element()->id())
+                    {
+                        new_steiner_point_another_side.push_back(geodesic::SurfacePoint(another_side_edges[j], 1 - offset));
+                    }
+                }
+
+                // calculate the path distance for the new Steiner point on two sides of the original vertex
+                // also calculate the path distance for the original vertex
+
+                // for one side
+                new_steiner_point_one_side_distance += algorithm.get_edge_pass_face_weight_2(&path[i + 1], &new_steiner_point_one_side[0]) *
+                                                       path[i + 1].distance(&new_steiner_point_one_side[0]);
+                for (unsigned j = 0; j < new_steiner_point_one_side.size() - 1; ++j)
+                {
+                    new_steiner_point_one_side_distance += algorithm.get_edge_pass_face_weight_2(&new_steiner_point_one_side[j], &new_steiner_point_one_side[j + 1]) *
+                                                           new_steiner_point_one_side[j].distance(&new_steiner_point_one_side[j + 1]);
+                }
+                new_steiner_point_one_side_distance += algorithm.get_edge_pass_face_weight_2(&new_steiner_point_one_side[new_steiner_point_one_side.size() - 1], &path[i - 1]) *
+                                                       new_steiner_point_one_side[new_steiner_point_one_side.size() - 1].distance(&path[i - 1]);
+
+                // for another side
+                new_steiner_point_another_side_distance += algorithm.get_edge_pass_face_weight_2(&path[i + 1], &new_steiner_point_another_side[0]) *
+                                                           path[i + 1].distance(&new_steiner_point_another_side[0]);
+                for (unsigned j = 0; j < new_steiner_point_another_side.size() - 1; ++j)
+                {
+                    new_steiner_point_another_side_distance += algorithm.get_edge_pass_face_weight_2(&new_steiner_point_another_side[j], &new_steiner_point_another_side[j + 1]) *
+                                                               new_steiner_point_another_side[j].distance(&new_steiner_point_another_side[j + 1]);
+                }
+                new_steiner_point_another_side_distance += algorithm.get_edge_pass_face_weight_2(&new_steiner_point_another_side[new_steiner_point_another_side.size() - 1], &path[i - 1]) *
+                                                           new_steiner_point_another_side[new_steiner_point_another_side.size() - 1].distance(&path[i - 1]);
+
+                // for original vertex side
+                original_vertex_distance += algorithm.get_edge_pass_face_weight_2(&path[i + 1], &path[i]) * path[i + 1].distance(&path[i]);
+                original_vertex_distance += algorithm.get_edge_pass_face_weight_2(&path[i], &path[i - 1]) * path[i].distance(&path[i - 1]);
+
+                // substitute the new steiner point on one side with the original vertex and stop the loop
+                if (original_vertex_distance - new_steiner_point_one_side_distance >= 0 &&
+                    new_steiner_point_one_side_distance <= new_steiner_point_another_side_distance)
+                {
+                    path.erase(path.begin() + i);
+                    for (int j = 0; j < new_steiner_point_one_side.size(); ++j)
+                    {
+                        path.insert(path.begin() + i, new_steiner_point_one_side[j]);
+                    }
+                    i--;
+                    i += new_steiner_point_one_side.size();
+                    path_length--;
+                    path_length += new_steiner_point_one_side.size();
+                    break;
+                }
+
+                // substitute the new steiner point on another side with the original vertex and stop the loop
+                if (original_vertex_distance - new_steiner_point_another_side_distance >= 0 &&
+                    new_steiner_point_one_side_distance >= new_steiner_point_another_side_distance)
+                {
+                    path.erase(path.begin() + i);
+                    for (int j = 0; j < new_steiner_point_another_side.size(); ++j)
+                    {
+                        path.insert(path.begin() + i, new_steiner_point_another_side[j]);
+                    }
+                    i--;
+                    i += new_steiner_point_another_side.size();
+                    path_length--;
+                    path_length += new_steiner_point_another_side.size();
+                    break;
+                }
+                loop_count++;
+            } while (loop_count <= max_loop_num_for_single_endpoint);
+        }
+
+        // *******
+        // follow the direction from destination to source (backward):
+        // if the point is connect to the real destination point of the path
+        // *******
+        else if (original_counter == 1 && path[i + 1].type() == geodesic::EDGE && path[i - 1].type() == geodesic::VERTEX)
+        {
+            // store the path distance for the new Steiner point on two sides of the original vertex
+            // also store the path distance for the original vertex
+            double new_steiner_point_one_side_distance;
+            double new_steiner_point_another_side_distance;
+            double original_vertex_distance;
+            int loop_count = 0;
+
+            do
+            {
+                new_steiner_point_one_side_distance = 1e100;
+                new_steiner_point_another_side_distance = 1e100;
+                original_vertex_distance = 0;
+
+                std::vector<geodesic::edge_pointer> edges_opposite_to_current;
+                edges_opposite_to_current.clear();
+
+                for (unsigned j = 0; j < s.base_element()->adjacent_faces().size(); ++j)
+                {
+                    geodesic::face_pointer f = s.base_element()->adjacent_faces()[j];
+
+                    // we will not include the edge that the previous Steiner point lies on
+                    if (f->opposite_edge(static_cast<geodesic::vertex_pointer>(s.base_element()))->id() == path[i + 1].base_element()->id())
+                    {
+                        continue;
+                    }
+                    edges_opposite_to_current.push_back(f->opposite_edge(static_cast<geodesic::vertex_pointer>(s.base_element())));
+                }
+
+                // store the vertices on one side (no matter left or right, both are okay) of the calculated path
+                std::vector<unsigned> one_side_vertices_id;
+
+                one_side_vertices_id.clear();
+
+                geodesic::vertex_pointer current_neighbor_1 = path[i + 1].base_element()->adjacent_vertices()[0];
+
+                one_side_vertices_id.push_back(current_neighbor_1->id());
+
+                std::vector<unsigned> already_added_edge_index_1;
+                int non_exits_count_1 = 0;
+                do
+                {
+                    for (unsigned j = 0; j < edges_opposite_to_current.size(); ++j)
+                    {
+                        if (std::find(already_added_edge_index_1.begin(), already_added_edge_index_1.end(), j) != already_added_edge_index_1.end())
+                        {
+                            continue;
+                        }
+                        if (current_neighbor_1->id() == edges_opposite_to_current[j]->adjacent_vertices()[0]->id())
+                        {
+                            current_neighbor_1 = edges_opposite_to_current[j]->adjacent_vertices()[1];
+                            one_side_vertices_id.push_back(current_neighbor_1->id());
+                            already_added_edge_index_1.push_back(j);
+                            break;
+                        }
+                        else if (current_neighbor_1->id() == edges_opposite_to_current[j]->adjacent_vertices()[1]->id())
+                        {
+                            current_neighbor_1 = edges_opposite_to_current[j]->adjacent_vertices()[0];
+                            one_side_vertices_id.push_back(current_neighbor_1->id());
+                            already_added_edge_index_1.push_back(j);
+                            break;
+                        }
+                    }
+                    non_exits_count_1++;
+
+                    // this side is on the boundary
+                    if (non_exits_count_1 > edges_opposite_to_current.size())
+                    {
+                        one_side_vertices_id.clear();
+                        break;
+                    }
+                } while (!(std::find(one_side_vertices_id.begin(), one_side_vertices_id.end(), destination.base_element()->id()) != one_side_vertices_id.end()));
+
+                if (one_side_vertices_id.size() != 0)
+                {
+                    one_side_vertices_id.erase(std::remove(one_side_vertices_id.begin(), one_side_vertices_id.end(), destination.base_element()->id()), one_side_vertices_id.end());
+                }
+
+                // store the vertices on another side (no matter left or right, both are okay) of the calculated path
+                std::vector<unsigned> another_side_vertices_id;
+                another_side_vertices_id.clear();
+
+                geodesic::vertex_pointer current_neighbor_2 = path[i + 1].base_element()->adjacent_vertices()[1];
+
+                another_side_vertices_id.push_back(current_neighbor_2->id());
+
+                std::vector<unsigned> already_added_edge_index_2;
+                int non_exits_count_2 = 0;
+                do
+                {
+                    for (unsigned j = 0; j < edges_opposite_to_current.size(); ++j)
+                    {
+                        if (std::find(already_added_edge_index_2.begin(), already_added_edge_index_2.end(), j) != already_added_edge_index_2.end())
+                        {
+                            continue;
+                        }
+                        if (current_neighbor_2->id() == edges_opposite_to_current[j]->adjacent_vertices()[0]->id())
+                        {
+                            current_neighbor_2 = edges_opposite_to_current[j]->adjacent_vertices()[1];
+                            another_side_vertices_id.push_back(current_neighbor_2->id());
+                            already_added_edge_index_2.push_back(j);
+                            break;
+                        }
+                        else if (current_neighbor_2->id() == edges_opposite_to_current[j]->adjacent_vertices()[1]->id())
+                        {
+                            current_neighbor_2 = edges_opposite_to_current[j]->adjacent_vertices()[0];
+                            another_side_vertices_id.push_back(current_neighbor_2->id());
+                            already_added_edge_index_2.push_back(j);
+                            break;
+                        }
+                    }
+                    non_exits_count_2++;
+
+                    // this side is on the boundary
+                    if (non_exits_count_2 > edges_opposite_to_current.size())
+                    {
+                        one_side_vertices_id.clear();
+                        break;
+                    }
+                } while (!(std::find(another_side_vertices_id.begin(), another_side_vertices_id.end(), destination.base_element()->id()) != another_side_vertices_id.end()));
+
+                if (another_side_vertices_id.size() != 0)
+                {
+                    another_side_vertices_id.erase(std::remove(another_side_vertices_id.begin(), another_side_vertices_id.end(), destination.base_element()->id()), another_side_vertices_id.end());
+                }
+
+                // store the edges on one side and another side (no matter left or right, both are okay) of the calculated path
+                std::vector<geodesic::edge_pointer> one_side_edges;
+                std::vector<geodesic::edge_pointer> another_side_edges;
+                one_side_edges.clear();
+                another_side_edges.clear();
+
+                for (unsigned j = 0; j < one_side_vertices_id.size(); ++j)
+                {
+                    for (unsigned k = 0; k < s.base_element()->adjacent_edges().size(); ++k)
+                    {
+                        geodesic::edge_pointer e = s.base_element()->adjacent_edges()[k];
+
+                        if (e->adjacent_vertices()[0]->id() == one_side_vertices_id[j] ||
+                            e->adjacent_vertices()[1]->id() == one_side_vertices_id[j])
+                        {
+                            one_side_edges.push_back(e);
+                            break;
+                        }
+                    }
+                }
+
+                for (unsigned j = 0; j < another_side_vertices_id.size(); ++j)
+                {
+                    for (unsigned k = 0; k < s.base_element()->adjacent_edges().size(); ++k)
+                    {
+                        geodesic::edge_pointer e = s.base_element()->adjacent_edges()[k];
+
+                        if (e->adjacent_vertices()[0]->id() == another_side_vertices_id[j] ||
+                            e->adjacent_vertices()[1]->id() == another_side_vertices_id[j])
+                        {
+                            another_side_edges.push_back(e);
+                            break;
+                        }
+                    }
+                }
+
+                std::vector<geodesic::SurfacePoint> new_steiner_point_one_side;
+                std::vector<geodesic::SurfacePoint> new_steiner_point_another_side;
+                new_steiner_point_one_side.clear();
+                new_steiner_point_another_side.clear();
+
+                double offset = 1 / ((double)(subdivision_level + 1) * pow(2, loop_count));
+
+                for (unsigned j = 0; j < one_side_edges.size(); ++j)
+                {
+                    if (one_side_edges[j]->adjacent_vertices()[0]->id() == s.base_element()->id())
+                    {
+                        new_steiner_point_one_side.push_back(geodesic::SurfacePoint(one_side_edges[j], offset));
+                    }
+                    else if (one_side_edges[j]->adjacent_vertices()[1]->id() == s.base_element()->id())
+                    {
+                        new_steiner_point_one_side.push_back(geodesic::SurfacePoint(one_side_edges[j], 1 - offset));
+                    }
+                }
+
+                for (unsigned j = 0; j < another_side_edges.size(); ++j)
+                {
+                    if (another_side_edges[j]->adjacent_vertices()[0]->id() == s.base_element()->id())
+                    {
+                        new_steiner_point_another_side.push_back(geodesic::SurfacePoint(another_side_edges[j], offset));
+                    }
+                    else if (another_side_edges[j]->adjacent_vertices()[1]->id() == s.base_element()->id())
+                    {
+                        new_steiner_point_another_side.push_back(geodesic::SurfacePoint(another_side_edges[j], 1 - offset));
+                    }
+                }
+
+                // calculate the path distance for the new Steiner point on two sides of the original vertex
+                // also calculate the path distance for the original vertex
+
+                // for one side
+                if (new_steiner_point_one_side.size() != 0)
+                {
+                    new_steiner_point_one_side_distance = 0;
+                    new_steiner_point_one_side_distance += algorithm.get_edge_pass_face_weight_2(&path[i + 1], &new_steiner_point_one_side[0]) *
+                                                           path[i + 1].distance(&new_steiner_point_one_side[0]);
+                    for (unsigned j = 0; j < new_steiner_point_one_side.size() - 1; ++j)
+                    {
+                        new_steiner_point_one_side_distance += algorithm.get_edge_pass_face_weight_2(&new_steiner_point_one_side[j], &new_steiner_point_one_side[j + 1]) *
+                                                               new_steiner_point_one_side[j].distance(&new_steiner_point_one_side[j + 1]);
+                    }
+                    new_steiner_point_one_side_distance += algorithm.get_edge_pass_face_weight_2(&new_steiner_point_one_side[new_steiner_point_one_side.size() - 1], &destination) *
+                                                           new_steiner_point_one_side[new_steiner_point_one_side.size() - 1].distance(&destination);
+                }
+
+                // for another side
+                if (new_steiner_point_another_side.size() != 0)
+                {
+                    new_steiner_point_another_side_distance = 0;
+                    new_steiner_point_another_side_distance += algorithm.get_edge_pass_face_weight_2(&path[i + 1], &new_steiner_point_another_side[0]) *
+                                                               path[i + 1].distance(&new_steiner_point_another_side[0]);
+                    for (unsigned j = 0; j < new_steiner_point_another_side.size() - 1; ++j)
+                    {
+                        new_steiner_point_another_side_distance += algorithm.get_edge_pass_face_weight_2(&new_steiner_point_another_side[j], &new_steiner_point_another_side[j + 1]) *
+                                                                   new_steiner_point_another_side[j].distance(&new_steiner_point_another_side[j + 1]);
+                    }
+                    new_steiner_point_another_side_distance += algorithm.get_edge_pass_face_weight_2(&new_steiner_point_another_side[new_steiner_point_another_side.size() - 1], &destination) *
+                                                               new_steiner_point_another_side[new_steiner_point_another_side.size() - 1].distance(&destination);
+                }
+
+                // for original vertex side
+                original_vertex_distance += algorithm.get_edge_pass_face_weight_2(&path[i + 1], &path[i]) * path[i + 1].distance(&path[i]);
+                original_vertex_distance += algorithm.get_edge_pass_face_weight_2(&path[i], &destination) * path[i].distance(&destination);
+
+                // substitute the new steiner point on one side with the original vertex and stop the loop
+                if (original_vertex_distance - new_steiner_point_one_side_distance >= 0 &&
+                    new_steiner_point_one_side_distance <= new_steiner_point_another_side_distance)
+                {
+                    path.erase(path.begin() + i);
+                    for (int j = 0; j < new_steiner_point_one_side.size(); ++j)
+                    {
+                        path.insert(path.begin() + i, new_steiner_point_one_side[j]);
+                    }
+                    i--;
+                    i += new_steiner_point_one_side.size();
+                    path_length--;
+                    path_length += new_steiner_point_one_side.size();
+                    break;
+                }
+
+                // substitute the new steiner point on another side with the original vertex and stop the loop
+                if (original_vertex_distance - new_steiner_point_another_side_distance >= 0 &&
+                    new_steiner_point_one_side_distance >= new_steiner_point_another_side_distance)
+                {
+                    path.erase(path.begin() + i);
+                    for (int j = 0; j < new_steiner_point_another_side.size(); ++j)
+                    {
+                        path.insert(path.begin() + i, new_steiner_point_another_side[j]);
+                    }
+                    i--;
+                    i += new_steiner_point_another_side.size();
+                    path_length--;
+                    path_length += new_steiner_point_another_side.size();
+                    break;
+                }
+                loop_count++;
+            } while (loop_count <= max_loop_num_for_single_endpoint);
+        }
+
+        // *******
+        // follow the direction from destination to source (backward):
+        // if the point is connect to the real source point of the path
+        // *******
+        else if (original_counter == fixed_path_length - 2 && path[i - 1].type() == geodesic::EDGE && path[i + 1].type() == geodesic::VERTEX)
+        {
+            // store the path distance for the new Steiner point on two sides of the original vertex
+            // also store the path distance for the original vertex
+            double new_steiner_point_one_side_distance;
+            double new_steiner_point_another_side_distance;
+            double original_vertex_distance;
+            int loop_count = 0;
+
+            do
+            {
+                new_steiner_point_one_side_distance = 1e100;
+                new_steiner_point_another_side_distance = 1e100;
+                original_vertex_distance = 0;
+
+                std::vector<geodesic::edge_pointer> edges_opposite_to_current;
+                edges_opposite_to_current.clear();
+
+                for (unsigned j = 0; j < s.base_element()->adjacent_faces().size(); ++j)
+                {
+                    geodesic::face_pointer f = s.base_element()->adjacent_faces()[j];
+
+                    // we will not include the edge that the next Steiner point lies on
+                    if (f->opposite_edge(static_cast<geodesic::vertex_pointer>(s.base_element()))->id() == path[i - 1].base_element()->id())
+                    {
+                        continue;
+                    }
+                    edges_opposite_to_current.push_back(f->opposite_edge(static_cast<geodesic::vertex_pointer>(s.base_element())));
+                }
+
+                // store the vertices on one side (no matter left or right, both are okay) of the calculated path
+                // std::vector<geodesic::SurfacePoint> one_side_vertices;
+                std::vector<unsigned> one_side_vertices_id;
+
+                one_side_vertices_id.clear();
+
+                geodesic::vertex_pointer current_neighbor_1 = path[i - 1].base_element()->adjacent_vertices()[0];
+
+                one_side_vertices_id.push_back(current_neighbor_1->id());
+
+                std::vector<unsigned> already_added_edge_index_1;
+                int non_exits_count_1 = 0;
+                do
+                {
+                    for (unsigned j = 0; j < edges_opposite_to_current.size(); ++j)
+                    {
+                        if (std::find(already_added_edge_index_1.begin(), already_added_edge_index_1.end(), j) != already_added_edge_index_1.end())
+                        {
+                            continue;
+                        }
+                        if (current_neighbor_1->id() == edges_opposite_to_current[j]->adjacent_vertices()[0]->id())
+                        {
+                            current_neighbor_1 = edges_opposite_to_current[j]->adjacent_vertices()[1];
+                            one_side_vertices_id.push_back(current_neighbor_1->id());
+                            already_added_edge_index_1.push_back(j);
+                            break;
+                        }
+                        else if (current_neighbor_1->id() == edges_opposite_to_current[j]->adjacent_vertices()[1]->id())
+                        {
+                            current_neighbor_1 = edges_opposite_to_current[j]->adjacent_vertices()[0];
+                            one_side_vertices_id.push_back(current_neighbor_1->id());
+                            already_added_edge_index_1.push_back(j);
+                            break;
+                        }
+                    }
+                    non_exits_count_1++;
+
+                    // this side is on the boundary
+                    if (non_exits_count_1 > edges_opposite_to_current.size())
+                    {
+                        one_side_vertices_id.clear();
+                        break;
+                    }
+                } while (!(std::find(one_side_vertices_id.begin(), one_side_vertices_id.end(), source.base_element()->id()) != one_side_vertices_id.end()));
+
+                if (one_side_vertices_id.size() != 0)
+                {
+                    one_side_vertices_id.erase(std::remove(one_side_vertices_id.begin(), one_side_vertices_id.end(), source.base_element()->id()), one_side_vertices_id.end());
+                }
+
+                // store the vertices on another side (no matter left or right, both are okay) of the calculated path
+                std::vector<unsigned> another_side_vertices_id;
+                another_side_vertices_id.clear();
+
+                geodesic::vertex_pointer current_neighbor_2 = path[i - 1].base_element()->adjacent_vertices()[1];
+
+                another_side_vertices_id.push_back(current_neighbor_2->id());
+
+                std::vector<unsigned> already_added_edge_index_2;
+                int non_exits_count_2 = 0;
+                do
+                {
+                    for (unsigned j = 0; j < edges_opposite_to_current.size(); ++j)
+                    {
+                        if (std::find(already_added_edge_index_2.begin(), already_added_edge_index_2.end(), j) != already_added_edge_index_2.end())
+                        {
+                            continue;
+                        }
+                        if (current_neighbor_2->id() == edges_opposite_to_current[j]->adjacent_vertices()[0]->id())
+                        {
+                            current_neighbor_2 = edges_opposite_to_current[j]->adjacent_vertices()[1];
+                            another_side_vertices_id.push_back(current_neighbor_2->id());
+                            already_added_edge_index_2.push_back(j);
+                            break;
+                        }
+                        else if (current_neighbor_2->id() == edges_opposite_to_current[j]->adjacent_vertices()[1]->id())
+                        {
+                            current_neighbor_2 = edges_opposite_to_current[j]->adjacent_vertices()[0];
+                            another_side_vertices_id.push_back(current_neighbor_2->id());
+                            already_added_edge_index_2.push_back(j);
+                            break;
+                        }
+                    }
+                    non_exits_count_2++;
+
+                    // this side is on the boundary
+                    if (non_exits_count_2 > edges_opposite_to_current.size())
+                    {
+                        one_side_vertices_id.clear();
+                        break;
+                    }
+                } while (!(std::find(another_side_vertices_id.begin(), another_side_vertices_id.end(), source.base_element()->id()) != another_side_vertices_id.end()));
+
+                if (another_side_vertices_id.size() != 0)
+                {
+                    another_side_vertices_id.erase(std::remove(another_side_vertices_id.begin(), another_side_vertices_id.end(), source.base_element()->id()), another_side_vertices_id.end());
+                }
+
+                // store the edges on one side and another side (no matter left or right, both are okay) of the calculated path
+                std::vector<geodesic::edge_pointer> one_side_edges;
+                std::vector<geodesic::edge_pointer> another_side_edges;
+                one_side_edges.clear();
+                another_side_edges.clear();
+
+                for (unsigned j = 0; j < one_side_vertices_id.size(); ++j)
+                {
+                    for (unsigned k = 0; k < s.base_element()->adjacent_edges().size(); ++k)
+                    {
+                        geodesic::edge_pointer e = s.base_element()->adjacent_edges()[k];
+
+                        if (e->adjacent_vertices()[0]->id() == one_side_vertices_id[j] ||
+                            e->adjacent_vertices()[1]->id() == one_side_vertices_id[j])
+                        {
+                            one_side_edges.push_back(e);
+                            break;
+                        }
+                    }
+                }
+
+                for (unsigned j = 0; j < another_side_vertices_id.size(); ++j)
+                {
+                    for (unsigned k = 0; k < s.base_element()->adjacent_edges().size(); ++k)
+                    {
+                        geodesic::edge_pointer e = s.base_element()->adjacent_edges()[k];
+
+                        if (e->adjacent_vertices()[0]->id() == another_side_vertices_id[j] ||
+                            e->adjacent_vertices()[1]->id() == another_side_vertices_id[j])
+                        {
+                            another_side_edges.push_back(e);
+                            break;
+                        }
+                    }
+                }
+
+                std::vector<geodesic::SurfacePoint> new_steiner_point_one_side;
+                std::vector<geodesic::SurfacePoint> new_steiner_point_another_side;
+                new_steiner_point_one_side.clear();
+                new_steiner_point_another_side.clear();
+
+                double offset = 1 / ((double)(subdivision_level + 1) * pow(2, loop_count));
+
+                for (unsigned j = 0; j < one_side_edges.size(); ++j)
+                {
+                    if (one_side_edges[j]->adjacent_vertices()[0]->id() == s.base_element()->id())
+                    {
+                        new_steiner_point_one_side.push_back(geodesic::SurfacePoint(one_side_edges[j], offset));
+                    }
+                    else if (one_side_edges[j]->adjacent_vertices()[1]->id() == s.base_element()->id())
+                    {
+                        new_steiner_point_one_side.push_back(geodesic::SurfacePoint(one_side_edges[j], 1 - offset));
+                    }
+                }
+
+                for (unsigned j = 0; j < another_side_edges.size(); ++j)
+                {
+                    if (another_side_edges[j]->adjacent_vertices()[0]->id() == s.base_element()->id())
+                    {
+                        new_steiner_point_another_side.push_back(geodesic::SurfacePoint(another_side_edges[j], offset));
+                    }
+                    else if (another_side_edges[j]->adjacent_vertices()[1]->id() == s.base_element()->id())
+                    {
+                        new_steiner_point_another_side.push_back(geodesic::SurfacePoint(another_side_edges[j], 1 - offset));
+                    }
+                }
+
+                // calculate the path distance for the new Steiner point on two sides of the original vertex
+                // also calculate the path distance for the original vertex
+
+                // for one side
+                if (new_steiner_point_one_side.size() != 0)
+                {
+                    new_steiner_point_one_side_distance = 0;
+                    new_steiner_point_one_side_distance += algorithm.get_edge_pass_face_weight_2(&path[i - 1], &new_steiner_point_one_side[0]) *
+                                                           path[i - 1].distance(&new_steiner_point_one_side[0]);
+                    for (unsigned j = 0; j < new_steiner_point_one_side.size() - 1; ++j)
+                    {
+                        new_steiner_point_one_side_distance += algorithm.get_edge_pass_face_weight_2(&new_steiner_point_one_side[j], &new_steiner_point_one_side[j + 1]) *
+                                                               new_steiner_point_one_side[j].distance(&new_steiner_point_one_side[j + 1]);
+                    }
+                    new_steiner_point_one_side_distance += algorithm.get_edge_pass_face_weight_2(&new_steiner_point_one_side[new_steiner_point_one_side.size() - 1], &source) *
+                                                           new_steiner_point_one_side[new_steiner_point_one_side.size() - 1].distance(&source);
+                }
+
+                // for another side
+                if (new_steiner_point_another_side.size() != 0)
+                {
+                    new_steiner_point_another_side_distance = 0;
+                    new_steiner_point_another_side_distance += algorithm.get_edge_pass_face_weight_2(&path[i - 1], &new_steiner_point_another_side[0]) *
+                                                               path[i - 1].distance(&new_steiner_point_another_side[0]);
+                    for (unsigned j = 0; j < new_steiner_point_another_side.size() - 1; ++j)
+                    {
+                        new_steiner_point_another_side_distance += algorithm.get_edge_pass_face_weight_2(&new_steiner_point_another_side[j], &new_steiner_point_another_side[j + 1]) *
+                                                                   new_steiner_point_another_side[j].distance(&new_steiner_point_another_side[j + 1]);
+                    }
+                    new_steiner_point_another_side_distance += algorithm.get_edge_pass_face_weight_2(&new_steiner_point_another_side[new_steiner_point_another_side.size() - 1], &source) *
+                                                               new_steiner_point_another_side[new_steiner_point_another_side.size() - 1].distance(&source);
+                }
+
+                // for original vertex side
+                original_vertex_distance += algorithm.get_edge_pass_face_weight_2(&path[i - 1], &path[i]) * path[i - 1].distance(&path[i]);
+                original_vertex_distance += algorithm.get_edge_pass_face_weight_2(&path[i], &source) * path[i].distance(&source);
+
+                // substitute the new steiner point on one side with the original vertex and stop the loop
+                if (original_vertex_distance - new_steiner_point_one_side_distance >= 0 &&
+                    new_steiner_point_one_side_distance <= new_steiner_point_another_side_distance)
+                {
+                    path.erase(path.begin() + i);
+                    for (int j = new_steiner_point_one_side.size() - 1; j >= 0; --j)
+                    {
+                        path.insert(path.begin() + i, new_steiner_point_one_side[j]);
+                    }
+                    i--;
+                    i += new_steiner_point_one_side.size();
+                    path_length--;
+                    path_length += new_steiner_point_one_side.size();
+                    break;
+                }
+
+                // substitute the new steiner point on another side with the original vertex and stop the loop
+                if (original_vertex_distance - new_steiner_point_another_side_distance >= 0 &&
+                    new_steiner_point_one_side_distance >= new_steiner_point_another_side_distance)
+                {
+                    path.erase(path.begin() + i);
+                    for (int j = new_steiner_point_another_side.size() - 1; j >= 0; --j)
+                    {
+                        path.insert(path.begin() + i, new_steiner_point_another_side[j]);
+                    }
+                    i--;
+                    i += new_steiner_point_another_side.size();
+                    path_length--;
+                    path_length += new_steiner_point_another_side.size();
+                    break;
+                }
+                loop_count++;
+            } while (loop_count <= max_loop_num_for_single_endpoint);
+        }
+
+        ++original_counter;
+    }
+}
+
 // cannot call this function directly, need to call log_Steiner_point_divide_and_conquer_helper
 void log_Steiner_point_divide_and_conquer(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
                                           geodesic::SurfacePoint &destination,
                                           std::vector<geodesic::SurfacePoint> &path,
                                           unsigned max_subdivision_log_level,
+                                          int removing_value,
                                           double delta, double r, int max_divide_and_conquer_subdivision_log_level,
                                           int max_loop_num_for_single_endpoint,
-                                          double &total_building_time, double &total_Steiner_point_memory_size)
+                                          double &total_building_time, double &total_Steiner_point_memory_size,
+                                          std::unordered_map<int, double> input_dist,
+                                          std::unordered_map<int, int> input_prev_node,
+                                          std::unordered_map<int, int> input_src_index,
+                                          std::unordered_map<int, double> &output_dist,
+                                          std::unordered_map<int, int> &output_prev_node,
+                                          std::unordered_map<int, int> &output_src_index)
 {
     auto start_building_time = std::chrono::high_resolution_clock::now();
-    geodesic::GeodesicAlgorithmSubdivisionLog algorithm(mesh, max_subdivision_log_level, delta, r);
+    geodesic::GeodesicAlgorithmSubdivisionLog algorithm(mesh, max_subdivision_log_level, removing_value, delta, r);
     auto stop_building_time = std::chrono::high_resolution_clock::now();
     auto duration_building_time = std::chrono::duration_cast<std::chrono::milliseconds>(stop_building_time - start_building_time);
     total_building_time += duration_building_time.count();
@@ -649,7 +1654,7 @@ void log_Steiner_point_divide_and_conquer(geodesic::Mesh *mesh, geodesic::Surfac
     geodesic::SurfacePoint successive_points_previous_vertex;
     int successive_points_count = 0;
 
-    algorithm.geodesic(source, destination, path);
+    algorithm.geodesic(source, destination, path, input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
     total_Steiner_point_memory_size += algorithm.return_memory();
 
     // follow the direction from destination to source (backward):
@@ -752,7 +1757,6 @@ void log_Steiner_point_divide_and_conquer(geodesic::Mesh *mesh, geodesic::Surfac
         if ((path[i - 1].type() == geodesic::EDGE && path[i + 1].type() == geodesic::VERTEX && original_counter != 1 && original_counter != fixed_path_length - 2) ||
             (original_counter == 1 && path[i + 1].type() == geodesic::VERTEX))
         {
-            std::cout << "start successive point" << std::endl;
             successive_points_previous_vertex = path[i - 1];
             ++successive_points_count;
         }
@@ -762,7 +1766,6 @@ void log_Steiner_point_divide_and_conquer(geodesic::Mesh *mesh, geodesic::Surfac
         // we delete current vertex
         else if (path[i - 1].type() == geodesic::VERTEX && path[i + 1].type() == geodesic::VERTEX && original_counter != 1 && original_counter != fixed_path_length - 2)
         {
-            std::cout << "store successive point" << std::endl;
             ++successive_points_count;
         }
 
@@ -775,7 +1778,6 @@ void log_Steiner_point_divide_and_conquer(geodesic::Mesh *mesh, geodesic::Surfac
         {
             if (successive_points_count > fixed_path_length / 4)
             {
-                std::cout << "handle successive point and divide-and-conquer" << std::endl;
 
                 for (int j = 0; j <= successive_points_count; ++j)
                 {
@@ -788,7 +1790,22 @@ void log_Steiner_point_divide_and_conquer(geodesic::Mesh *mesh, geodesic::Surfac
 
                 std::vector<geodesic::SurfacePoint> sub_path;
                 sub_path.clear();
-                log_Steiner_point_divide_and_conquer(mesh, path[i + 1], successive_points_previous_vertex, sub_path, 2 * max_subdivision_log_level, delta, r / 2, max_divide_and_conquer_subdivision_log_level, max_loop_num_for_single_endpoint, total_building_time, total_Steiner_point_memory_size);
+                std::unordered_map<int, double> input_dist2;
+                std::unordered_map<int, int> input_prev_node2;
+                std::unordered_map<int, int> input_src_index2;
+                std::unordered_map<int, double> output_dist2;
+                std::unordered_map<int, int> output_prev_node2;
+                std::unordered_map<int, int> output_src_index2;
+                input_dist2.clear();
+                input_prev_node2.clear();
+                input_src_index2.clear();
+                output_dist2.clear();
+                output_prev_node2.clear();
+                output_src_index2.clear();
+                log_Steiner_point_divide_and_conquer(
+                    mesh, path[i + 1], successive_points_previous_vertex, sub_path, 2 * max_subdivision_log_level, 0,
+                    delta, r / 2, max_divide_and_conquer_subdivision_log_level, max_loop_num_for_single_endpoint, total_building_time, total_Steiner_point_memory_size,
+                    input_dist2, input_prev_node2, input_src_index2, output_dist2, output_prev_node2, output_src_index2);
 
                 for (int j = sub_path.size() - 2; j >= 1; --j)
                 {
@@ -1591,14 +2608,57 @@ void log_Steiner_point_divide_and_conquer(geodesic::Mesh *mesh, geodesic::Surfac
     }
 }
 
+// can directly call this function to run the divide and conquer for fixed Steiner point algorithm
+void fixed_Steiner_point_divide_and_conquer_helper(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
+                                                   geodesic::SurfacePoint &destination,
+                                                   std::vector<geodesic::SurfacePoint> &path,
+                                                   double epsilon, int removing_value, int estimate_path_length,
+                                                   int max_loop_num_for_divide_and_conquer,
+                                                   int max_loop_num_for_single_endpoint,
+                                                   double &total_building_time, double &total_Steiner_point_time,
+                                                   double &total_Steiner_point_memory_size,
+                                                   std::unordered_map<int, double> input_dist,
+                                                   std::unordered_map<int, int> input_prev_node,
+                                                   std::unordered_map<int, int> input_src_index,
+                                                   std::unordered_map<int, double> &output_dist,
+                                                   std::unordered_map<int, int> &output_prev_node,
+                                                   std::unordered_map<int, int> &output_src_index)
+{
+    unsigned subdivision_level;
+    fixed_Steiner_point_epsilon_to_subdivision_level(mesh, epsilon, estimate_path_length, subdivision_level);
+    std::cout << "Original subdivision level: " << subdivision_level << std::endl;
+    unsigned max_divide_and_conquer_subdivision_level = max_loop_num_for_divide_and_conquer * subdivision_level;
+    path.clear();
+
+    auto start_total_Steiner_point_time = std::chrono::high_resolution_clock::now();
+    fixed_Steiner_point_divide_and_conquer(mesh, source, destination, path, subdivision_level, removing_value, max_divide_and_conquer_subdivision_level,
+                                           max_loop_num_for_single_endpoint, total_building_time, total_Steiner_point_memory_size,
+                                           input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
+    auto stop_total_Steiner_point_time = std::chrono::high_resolution_clock::now();
+    auto duration_total_Steiner_point_time = std::chrono::duration_cast<std::chrono::milliseconds>(stop_total_Steiner_point_time - start_total_Steiner_point_time);
+    total_Steiner_point_time = duration_total_Steiner_point_time.count();
+    total_Steiner_point_memory_size += path.size() * sizeof(geodesic::SurfacePoint);
+
+    double total_distance;
+    total_distance = path_distance(path, path);
+    std::cout << "Fixed Steiner point divide and conquer distance: " << total_distance << std::endl;
+}
+
 // can directly call this function to run the divide and conquer for log Steiner point algorithm
 void log_Steiner_point_divide_and_conquer_helper(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
                                                  geodesic::SurfacePoint &destination,
                                                  std::vector<geodesic::SurfacePoint> &path,
-                                                 double epsilon, int max_loop_num_for_divide_and_conquer,
+                                                 double epsilon, int removing_value,
+                                                 int max_loop_num_for_divide_and_conquer,
                                                  int max_loop_num_for_single_endpoint,
                                                  double &total_building_time, double &total_Steiner_point_time,
-                                                 double &total_Steiner_point_memory_size)
+                                                 double &total_Steiner_point_memory_size,
+                                                 std::unordered_map<int, double> input_dist,
+                                                 std::unordered_map<int, int> input_prev_node,
+                                                 std::unordered_map<int, int> input_src_index,
+                                                 std::unordered_map<int, double> &output_dist,
+                                                 std::unordered_map<int, int> &output_prev_node,
+                                                 std::unordered_map<int, int> &output_src_index)
 {
     unsigned max_subdivision_log_level;
     double delta;
@@ -1609,7 +2669,9 @@ void log_Steiner_point_divide_and_conquer_helper(geodesic::Mesh *mesh, geodesic:
     path.clear();
 
     auto start_total_Steiner_point_time = std::chrono::high_resolution_clock::now();
-    log_Steiner_point_divide_and_conquer(mesh, source, destination, path, max_subdivision_log_level, delta, r, max_divide_and_conquer_subdivision_log_level, max_loop_num_for_single_endpoint, total_building_time, total_Steiner_point_memory_size);
+    log_Steiner_point_divide_and_conquer(mesh, source, destination, path, max_subdivision_log_level, removing_value, delta, r, max_divide_and_conquer_subdivision_log_level,
+                                         max_loop_num_for_single_endpoint, total_building_time, total_Steiner_point_memory_size,
+                                         input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
     auto stop_total_Steiner_point_time = std::chrono::high_resolution_clock::now();
     auto duration_total_Steiner_point_time = std::chrono::duration_cast<std::chrono::milliseconds>(stop_total_Steiner_point_time - start_total_Steiner_point_time);
     total_Steiner_point_time = duration_total_Steiner_point_time.count();
@@ -1638,7 +2700,6 @@ void get_edge_sequence(geodesic::Mesh *mesh,
             }
         }
     }
-    std::cout << "edge sequence size: " << edge_sequence.size() << std::endl;
 }
 
 // get the edge sequence that the shortest path passes
@@ -1669,13 +2730,13 @@ void get_face_sequence(geodesic::Mesh *mesh,
             }
         }
     }
-    std::cout << "face sequence size: " << face_sequence.size() << std::endl;
 }
 
 void simulate_exact_path(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
                          geodesic::SurfacePoint &destination,
                          std::vector<geodesic::SurfacePoint> &path,
-                         double Steiner_point_epsilon, int estimate_path_length,
+                         double Steiner_point_epsilon, int removing_value,
+                         int estimate_path_length,
                          double snell_law_epsilon,
                          std::vector<geodesic::SurfacePoint> &result_path,
                          double &result_path_distance)
@@ -1683,7 +2744,21 @@ void simulate_exact_path(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
     double building_time;
     double Steiner_point_query_time;
     double Steiner_point_memory_size;
-    fixed_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, estimate_path_length, building_time, Steiner_point_query_time, Steiner_point_memory_size);
+    std::unordered_map<int, double> input_dist;
+    std::unordered_map<int, int> input_prev_node;
+    std::unordered_map<int, int> input_src_index;
+    std::unordered_map<int, double> output_dist;
+    std::unordered_map<int, int> output_prev_node;
+    std::unordered_map<int, int> output_src_index;
+    input_dist.clear();
+    input_prev_node.clear();
+    input_src_index.clear();
+    output_dist.clear();
+    output_prev_node.clear();
+    output_src_index.clear();
+    fixed_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, removing_value,
+                        estimate_path_length, building_time, Steiner_point_query_time, Steiner_point_memory_size,
+                        input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
 
     double snell_law_delta;
     snell_law_epsilon_to_delta(mesh, snell_law_epsilon, path.size() - 1, snell_law_delta);
@@ -1744,7 +2819,7 @@ void simulate_exact_path(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
 
             int binary_search_of_snell_law_path_count = 0;
 
-            baseline_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta, binary_search_of_snell_law_path_count, total_snell_law_memory_size);
+            baseline_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta, binary_search_of_snell_law_path_count, total_snell_law_memory_size, segment_path_list.size());
 
             for (int j = snell_law_path.size() - 2; j >= 0; --j)
             {
@@ -1768,6 +2843,21 @@ void simulate_exact_path(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
             result_path.push_back(path[i]);
         }
         result_path_distance = total_distance_Steiner_point;
+        std::cout << "Fixed Steiner point distance is shorter" << std::endl;
+    }
+}
+
+void checking_distance(double Steiner_point_epsilon, int removing_value,
+                       double rough_path_dist, double refined_path_dist, bool &need_further_refine)
+{
+    if ((removing_value <= 2 && refined_path_dist / rough_path_dist <= (1 + (1 + log(removing_value + 1)) * Steiner_point_epsilon) / (1 + Steiner_point_epsilon)) ||
+        (removing_value > 2 && refined_path_dist / rough_path_dist <= (1 + Steiner_point_epsilon) / (1 + (1 + log(removing_value + 1)) * Steiner_point_epsilon)))
+    {
+        need_further_refine = false;
+    }
+    else
+    {
+        need_further_refine = true;
     }
 }
 
@@ -1791,7 +2881,20 @@ void fixed_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::Surface
     double building_time;
     double Steiner_point_query_time;
     double Steiner_point_memory_size;
-    fixed_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, estimate_path_length, building_time, Steiner_point_query_time, Steiner_point_memory_size);
+    std::unordered_map<int, double> input_dist;
+    std::unordered_map<int, int> input_prev_node;
+    std::unordered_map<int, int> input_src_index;
+    std::unordered_map<int, double> output_dist;
+    std::unordered_map<int, int> output_prev_node;
+    std::unordered_map<int, int> output_src_index;
+    input_dist.clear();
+    input_prev_node.clear();
+    input_src_index.clear();
+    output_dist.clear();
+    output_prev_node.clear();
+    output_src_index.clear();
+    fixed_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, 0, estimate_path_length, building_time, Steiner_point_query_time, Steiner_point_memory_size,
+                        input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
 
     double total_distance_Steiner_point;
     total_distance_Steiner_point = path_distance(path, path);
@@ -1806,7 +2909,7 @@ void fixed_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::Surface
     double distance_error = total_distance_Steiner_point / total_distance_exact_path - 1;
 
     std::cout << "# Summary #" << std::endl;
-    std::cout << "Dataset, datasize, epsilon, epsilon_SP, epsilon_SL: " << write_file_header << std::endl;
+    std::cout << "Dataset, datasize, epsilon, removing value: " << write_file_header << std::endl;
     std::cout << "Fixed Steiner point building time: " << building_time << " milliseconds" << std::endl;
     std::cout << "Fixed Steiner point query time: " << Steiner_point_query_time << " milliseconds" << std::endl;
     std::cout << "Fixed Steiner point memory usage: " << Steiner_point_memory_size / 1e6 << " MB" << std::endl;
@@ -1819,8 +2922,10 @@ void fixed_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::Surface
         << building_time << "\t"
         << Steiner_point_query_time << "\t"
         << "0\t"
+        << "0\t"
         << Steiner_point_query_time << "\t"
         << Steiner_point_memory_size / 1e6 << "\t"
+        << "0\t"
         << "0\t"
         << Steiner_point_memory_size / 1e6 << "\t"
         << "0\t"
@@ -1843,7 +2948,20 @@ void log_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::SurfacePo
     double building_time;
     double Steiner_point_query_time;
     double Steiner_point_memory_size;
-    log_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, building_time, Steiner_point_query_time, Steiner_point_memory_size);
+    std::unordered_map<int, double> input_dist;
+    std::unordered_map<int, int> input_prev_node;
+    std::unordered_map<int, int> input_src_index;
+    std::unordered_map<int, double> output_dist;
+    std::unordered_map<int, int> output_prev_node;
+    std::unordered_map<int, int> output_src_index;
+    input_dist.clear();
+    input_prev_node.clear();
+    input_src_index.clear();
+    output_dist.clear();
+    output_prev_node.clear();
+    output_src_index.clear();
+    log_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, 0, building_time, Steiner_point_query_time, Steiner_point_memory_size,
+                      input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
 
     double total_distance_Steiner_point;
     total_distance_Steiner_point = path_distance(path, path);
@@ -1858,7 +2976,7 @@ void log_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::SurfacePo
     double distance_error = total_distance_Steiner_point / total_distance_exact_path - 1;
 
     std::cout << "# Summary #" << std::endl;
-    std::cout << "Dataset, datasize, epsilon, epsilon_SP, epsilon_SL: " << write_file_header << std::endl;
+    std::cout << "Dataset, datasize, epsilon, removing value: " << write_file_header << std::endl;
     std::cout << "Log Steiner point building time: " << building_time << " milliseconds" << std::endl;
     std::cout << "Log Steiner point query time: " << Steiner_point_query_time << " milliseconds" << std::endl;
     std::cout << "Log Steiner point memory usage: " << Steiner_point_memory_size / 1e6 << " MB" << std::endl;
@@ -1871,8 +2989,10 @@ void log_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::SurfacePo
         << building_time << "\t"
         << Steiner_point_query_time << "\t"
         << "0\t"
+        << "0\t"
         << Steiner_point_query_time << "\t"
         << Steiner_point_memory_size / 1e6 << "\t"
+        << "0\t"
         << "0\t"
         << Steiner_point_memory_size / 1e6 << "\t"
         << "0\t"
@@ -1882,19 +3002,35 @@ void log_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::SurfacePo
     ofs.close();
 }
 
-// the fixed Steiner point algorithm with binary search snell law (without divide and conquer)
-void fixed_Steiner_point_and_binary_search_snell_law(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
-                                                     geodesic::SurfacePoint &destination,
-                                                     std::vector<geodesic::SurfacePoint> &path,
-                                                     std::string write_file_header,
-                                                     double Steiner_point_epsilon, int estimate_path_length,
-                                                     double snell_law_epsilon, double total_distance_exact_path,
-                                                     std::vector<geodesic::SurfacePoint> &result_path)
+// the fixed Steiner point algorithm (without divide and conquer) with binary search snell law with or without pruned Dijkstra
+void fixed_Steiner_point_and_binary_search_snell_law(
+    geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
+    geodesic::SurfacePoint &destination,
+    std::vector<geodesic::SurfacePoint> &path,
+    std::string write_file_header,
+    double Steiner_point_epsilon, int removing_value, int estimate_path_length,
+    double snell_law_epsilon, double total_distance_exact_path,
+    std::vector<geodesic::SurfacePoint> &result_path,
+    bool pruned_Dijkstra)
 {
     double building_time;
     double Steiner_point_query_time;
     double Steiner_point_memory_size;
-    fixed_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, estimate_path_length, building_time, Steiner_point_query_time, Steiner_point_memory_size);
+    std::unordered_map<int, double> input_dist;
+    std::unordered_map<int, int> input_prev_node;
+    std::unordered_map<int, int> input_src_index;
+    std::unordered_map<int, double> output_dist;
+    std::unordered_map<int, int> output_prev_node;
+    std::unordered_map<int, int> output_src_index;
+    input_dist.clear();
+    input_prev_node.clear();
+    input_src_index.clear();
+    output_dist.clear();
+    output_prev_node.clear();
+    output_src_index.clear();
+    fixed_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, removing_value,
+                        estimate_path_length, building_time, Steiner_point_query_time, Steiner_point_memory_size,
+                        input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
 
     double snell_law_delta;
     snell_law_epsilon_to_delta(mesh, snell_law_epsilon, path.size() - 1, snell_law_delta);
@@ -1904,8 +3040,7 @@ void fixed_Steiner_point_and_binary_search_snell_law(geodesic::Mesh *mesh, geode
     // between two vertices, and apply snell law on such a segment, then combine these segments
     // together in the final path result
 
-    std::vector<geodesic::SurfacePoint>
-        segment_source_list;
+    std::vector<geodesic::SurfacePoint> segment_source_list;
     std::vector<geodesic::SurfacePoint> segment_destination_list;
     std::vector<std::vector<geodesic::SurfacePoint>> segment_path_list;
     std::vector<geodesic::SurfacePoint> one_segment_path;
@@ -1943,8 +3078,6 @@ void fixed_Steiner_point_and_binary_search_snell_law(geodesic::Mesh *mesh, geode
     segment_path_list.push_back(one_segment_path);
     one_segment_path.clear();
 
-    std::cout << "segment path list size: " << segment_path_list.size() << std::endl;
-
     double total_snell_law_query_time = 0;
     int total_binary_search_of_snell_law_path_count = 0;
     double total_snell_law_memory_size = 0;
@@ -1968,13 +3101,12 @@ void fixed_Steiner_point_and_binary_search_snell_law(geodesic::Mesh *mesh, geode
 
             auto start = std::chrono::high_resolution_clock::now();
 
-            baseline_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta, binary_search_of_snell_law_path_count, total_snell_law_memory_size);
+            baseline_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta, binary_search_of_snell_law_path_count, total_snell_law_memory_size, segment_path_list.size());
 
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
 
             total_snell_law_query_time += duration.count();
-            std::cout << "Binary search snell law query time: " << duration.count() << " milliseconds" << std::endl;
 
             total_binary_search_of_snell_law_path_count += binary_search_of_snell_law_path_count;
 
@@ -2005,35 +3137,70 @@ void fixed_Steiner_point_and_binary_search_snell_law(geodesic::Mesh *mesh, geode
             result_path.push_back(path[i]);
         }
         total_distance_snell_law = total_distance_Steiner_point;
-        std::cout << "Fixed Steiner point distance is shorter, and the final distance is: " << total_distance_Steiner_point << std::endl;
+        std::cout << "Fixed Steiner point distance is shorter" << std::endl;
+    }
+
+    bool need_further_refine;
+    checking_distance(Steiner_point_epsilon, removing_value, total_distance_Steiner_point, total_distance_snell_law, need_further_refine);
+    double building_time_refined = 0;
+    double Steiner_point_query_time_refined = 0;
+    double Steiner_point_memory_size_refined = 0;
+    if (need_further_refine)
+    {
+        path.clear();
+        if (!pruned_Dijkstra)
+        {
+            output_dist.clear();
+            output_prev_node.clear();
+            output_src_index.clear();
+        }
+        fixed_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, 0, estimate_path_length, building_time_refined, Steiner_point_query_time_refined, Steiner_point_memory_size_refined,
+                            output_dist, output_prev_node, output_src_index, input_dist, input_prev_node, input_src_index);
+        result_path.clear();
+        for (int i = 0; i < path.size(); ++i)
+        {
+            result_path.push_back(path[i]);
+        }
+        total_distance_snell_law = path_distance(path, path);
     }
 
     double distance_error = total_distance_snell_law / total_distance_exact_path - 1;
 
     std::cout << "# Summary #" << std::endl;
-    std::cout << "Dataset, datasize, epsilon, epsilon_SP, epsilon_SL: " << write_file_header << std::endl;
-    std::cout << "Fixed Steiner point building time: " << building_time << " milliseconds" << std::endl;
-    std::cout << "Fixed Steiner point (without divide and conquer) query time: " << Steiner_point_query_time << " milliseconds" << std::endl;
+    std::cout << "Dataset, datasize, epsilon, removing value: " << write_file_header << std::endl;
+    std::cout << "Total fixed Steiner point building time: " << building_time << " milliseconds" << std::endl;
+    std::cout << "Total rough fixed Steiner point (without divide and conquer) query time: " << Steiner_point_query_time << " milliseconds" << std::endl;
     std::cout << "Total binary search snell law query time: " << total_snell_law_query_time << " milliseconds" << std::endl;
-    std::cout << "Total query time: " << Steiner_point_query_time + total_snell_law_query_time << " milliseconds" << std::endl;
-    std::cout << "Fixed Steiner point (without divide and conquer) memory usage: " << Steiner_point_memory_size / 1e6 << " MB" << std::endl;
+    std::cout << "Total refined fixed Steiner point query time: " << Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total query time: " << Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total rough fixed Steiner point (without divide and conquer) memory usage: " << Steiner_point_memory_size / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search snell law path memory usage: " << total_snell_law_memory_size / 1e6 << " MB" << std::endl;
-    std::cout << "Total memory usage: " << (Steiner_point_memory_size + total_snell_law_memory_size) / 1e6 << " MB" << std::endl;
+    std::cout << "Total refined fixed Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
+    std::cout << "Total memory usage: " << (Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search snell law path count: " << total_binary_search_of_snell_law_path_count << std::endl;
     std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
     std::cout << "Total distance: " << total_distance_snell_law << std::endl;
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
     std::ofstream ofs("../output/output.txt", std::ios_base::app);
-    ofs << "== FixSP-BinarySearch ==\n";
+    if (pruned_Dijkstra)
+    {
+        ofs << "== Roug - Ref (., FixSP, NoEdgSeqConv, NoEffWeig) ==\n";
+    }
+    else
+    {
+        ofs << "== Roug - Ref (NoPrunDijk, FixSP, NoEdgSeqConv, NoEffWeig) ==\n";
+    }
     ofs << write_file_header << "\t"
         << building_time << "\t"
         << Steiner_point_query_time << "\t"
         << total_snell_law_query_time << "\t"
-        << Steiner_point_query_time + total_snell_law_query_time << "\t"
+        << Steiner_point_query_time_refined << "\t"
+        << Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << "\t"
         << Steiner_point_memory_size / 1e6 << "\t"
         << total_snell_law_memory_size / 1e6 << "\t"
-        << (Steiner_point_memory_size + total_snell_law_memory_size) / 1e6 << "\t"
+        << Steiner_point_memory_size_refined / 1e6 << "\t"
+        << (Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << "\t"
         << total_binary_search_of_snell_law_path_count << "\t"
         << distance_error * 100 << "\t"
         << total_distance_snell_law << "\t"
@@ -2041,19 +3208,35 @@ void fixed_Steiner_point_and_binary_search_snell_law(geodesic::Mesh *mesh, geode
     ofs.close();
 }
 
-// the fixed Steiner point algorithm with effective weight snell law (without divide and conquer)
-void fixed_Steiner_point_and_effective_weight_snell_law(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
-                                                        geodesic::SurfacePoint &destination,
-                                                        std::vector<geodesic::SurfacePoint> &path,
-                                                        std::string write_file_header,
-                                                        double Steiner_point_epsilon, int estimate_path_length,
-                                                        double snell_law_epsilon, double total_distance_exact_path,
-                                                        std::vector<geodesic::SurfacePoint> &result_path)
+// the fixed Steiner point algorithm (without divide and conquer) with effective weight snell law with or without pruned Dijkstra
+void fixed_Steiner_point_and_effective_weight_snell_law(
+    geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
+    geodesic::SurfacePoint &destination,
+    std::vector<geodesic::SurfacePoint> &path,
+    std::string write_file_header,
+    double Steiner_point_epsilon, int removing_value, int estimate_path_length,
+    double snell_law_epsilon, double total_distance_exact_path,
+    std::vector<geodesic::SurfacePoint> &result_path,
+    bool pruned_Dijkstra)
 {
     double building_time;
     double Steiner_point_query_time;
     double Steiner_point_memory_size;
-    fixed_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, estimate_path_length, building_time, Steiner_point_query_time, Steiner_point_memory_size);
+    std::unordered_map<int, double> input_dist;
+    std::unordered_map<int, int> input_prev_node;
+    std::unordered_map<int, int> input_src_index;
+    std::unordered_map<int, double> output_dist;
+    std::unordered_map<int, int> output_prev_node;
+    std::unordered_map<int, int> output_src_index;
+    input_dist.clear();
+    input_prev_node.clear();
+    input_src_index.clear();
+    output_dist.clear();
+    output_prev_node.clear();
+    output_src_index.clear();
+    fixed_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, removing_value,
+                        estimate_path_length, building_time, Steiner_point_query_time, Steiner_point_memory_size,
+                        input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
 
     double snell_law_delta;
     snell_law_epsilon_to_delta(mesh, snell_law_epsilon, path.size() - 1, snell_law_delta);
@@ -2101,8 +3284,6 @@ void fixed_Steiner_point_and_effective_weight_snell_law(geodesic::Mesh *mesh, ge
     segment_path_list.push_back(one_segment_path);
     one_segment_path.clear();
 
-    std::cout << "segment path list size: " << segment_path_list.size() << std::endl;
-
     double total_snell_law_query_time = 0;
     int total_binary_search_and_effective_weight_of_snell_law_path_count = 0;
     double total_snell_law_memory_size = 0;
@@ -2126,13 +3307,12 @@ void fixed_Steiner_point_and_effective_weight_snell_law(geodesic::Mesh *mesh, ge
 
             auto start = std::chrono::high_resolution_clock::now();
 
-            effective_weight_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta * 20, binary_search_and_effective_weight_of_snell_law_path_count, total_snell_law_memory_size);
+            effective_weight_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta, binary_search_and_effective_weight_of_snell_law_path_count, total_snell_law_memory_size, segment_path_list.size());
 
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
 
             total_snell_law_query_time += duration.count();
-            std::cout << "Effective weight snell law query time: " << duration.count() << " milliseconds" << std::endl;
 
             total_binary_search_and_effective_weight_of_snell_law_path_count += binary_search_and_effective_weight_of_snell_law_path_count;
 
@@ -2163,35 +3343,70 @@ void fixed_Steiner_point_and_effective_weight_snell_law(geodesic::Mesh *mesh, ge
             result_path.push_back(path[i]);
         }
         total_distance_snell_law = total_distance_Steiner_point;
-        std::cout << "Fixed Steiner point distance is shorter, and the final distance is: " << total_distance_Steiner_point << std::endl;
+        std::cout << "Fixed Steiner point distance is shorter" << std::endl;
+    }
+
+    bool need_further_refine;
+    checking_distance(Steiner_point_epsilon, removing_value, total_distance_Steiner_point, total_distance_snell_law, need_further_refine);
+    double building_time_refined = 0;
+    double Steiner_point_query_time_refined = 0;
+    double Steiner_point_memory_size_refined = 0;
+    if (need_further_refine)
+    {
+        path.clear();
+        if (!pruned_Dijkstra)
+        {
+            output_dist.clear();
+            output_prev_node.clear();
+            output_src_index.clear();
+        }
+        fixed_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, 0, estimate_path_length, building_time_refined, Steiner_point_query_time_refined, Steiner_point_memory_size_refined,
+                            output_dist, output_prev_node, output_src_index, input_dist, input_prev_node, input_src_index);
+        result_path.clear();
+        for (int i = 0; i < path.size(); ++i)
+        {
+            result_path.push_back(path[i]);
+        }
+        total_distance_snell_law = path_distance(path, path);
     }
 
     double distance_error = total_distance_snell_law / total_distance_exact_path - 1;
 
     std::cout << "# Summary #" << std::endl;
-    std::cout << "Dataset, datasize, epsilon, epsilon_SP, epsilon_SL: " << write_file_header << std::endl;
-    std::cout << "Fixed Steiner point building time: " << building_time << " milliseconds" << std::endl;
-    std::cout << "Fixed Steiner point (without divide and conquer) query time: " << Steiner_point_query_time << " milliseconds" << std::endl;
+    std::cout << "Dataset, datasize, epsilon, removing value: " << write_file_header << std::endl;
+    std::cout << "Total fixed Steiner point building time: " << building_time << " milliseconds" << std::endl;
+    std::cout << "Total rough fixed Steiner point (without divide and conquer) query time: " << Steiner_point_query_time << " milliseconds" << std::endl;
     std::cout << "Total effective weight snell law query time: " << total_snell_law_query_time << " milliseconds" << std::endl;
-    std::cout << "Total query time: " << Steiner_point_query_time + total_snell_law_query_time << " milliseconds" << std::endl;
-    std::cout << "Fixed Steiner point (without divide and conquer) memory usage: " << Steiner_point_memory_size / 1e6 << " MB" << std::endl;
+    std::cout << "Total refined fixed Steiner point query time: " << Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total query time: " << Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total rough fixed Steiner point (without divide and conquer) memory usage: " << Steiner_point_memory_size / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search and effective weight snell law path memory usage: " << total_snell_law_memory_size / 1e6 << " MB" << std::endl;
-    std::cout << "Total memory usage: " << (Steiner_point_memory_size + total_snell_law_memory_size) / 1e6 << " MB" << std::endl;
+    std::cout << "Total refined fixed Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
+    std::cout << "Total memory usage: " << (Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search and effective weight snell law path count: " << total_binary_search_and_effective_weight_of_snell_law_path_count << std::endl;
     std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
     std::cout << "Total distance: " << total_distance_snell_law << std::endl;
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
     std::ofstream ofs("../output/output.txt", std::ios_base::app);
-    ofs << "== FixSP-EffWeight ==\n";
+    if (pruned_Dijkstra)
+    {
+        ofs << "== Roug - Ref (., FixSP, NoEdgSeqConv, .) ==\n";
+    }
+    else
+    {
+        ofs << "== Roug - Ref (NoPrunDijk, FixSP, NoEdgSeqConv, .) ==\n";
+    }
     ofs << write_file_header << "\t"
         << building_time << "\t"
         << Steiner_point_query_time << "\t"
         << total_snell_law_query_time << "\t"
-        << Steiner_point_query_time + total_snell_law_query_time << "\t"
+        << Steiner_point_query_time_refined << "\t"
+        << Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << "\t"
         << Steiner_point_memory_size / 1e6 << "\t"
         << total_snell_law_memory_size / 1e6 << "\t"
-        << (Steiner_point_memory_size + total_snell_law_memory_size) / 1e6 << "\t"
+        << Steiner_point_memory_size_refined / 1e6 << "\t"
+        << (Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << "\t"
         << total_binary_search_and_effective_weight_of_snell_law_path_count << "\t"
         << distance_error * 100 << "\t"
         << total_distance_snell_law << "\t"
@@ -2199,22 +3414,41 @@ void fixed_Steiner_point_and_effective_weight_snell_law(geodesic::Mesh *mesh, ge
     ofs.close();
 }
 
-// the log Steiner point algorithm and divide and conquer with binary search snell law
-void log_Steiner_point_divide_and_conquer_and_binary_search_snell_law(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
-                                                                      geodesic::SurfacePoint &destination,
-                                                                      std::vector<geodesic::SurfacePoint> &path,
-                                                                      std::string write_file_header,
-                                                                      double Steiner_point_epsilon, double snell_law_epsilon,
-                                                                      int max_loop_num_for_divide_and_conquer,
-                                                                      int max_loop_num_for_single_endpoint,
-                                                                      double total_distance_exact_path,
-                                                                      std::vector<geodesic::SurfacePoint> &result_path)
+// the fixed Steiner point algorithm and divide and conquer with binary search snell law with or without pruned Dijkstra
+void fixed_Steiner_point_divide_and_conquer_and_binary_search_snell_law(
+    geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
+    geodesic::SurfacePoint &destination,
+    std::vector<geodesic::SurfacePoint> &path,
+    std::string write_file_header,
+    double Steiner_point_epsilon, int removing_value,
+    int estimate_path_length,
+    double snell_law_epsilon,
+    int max_loop_num_for_divide_and_conquer,
+    int max_loop_num_for_single_endpoint,
+    double total_distance_exact_path,
+    std::vector<geodesic::SurfacePoint> &result_path,
+    bool pruned_Dijkstra)
 {
     double total_building_time = 0;
     double total_Steiner_point_time;
     double total_Steiner_point_query_time;
     double total_Steiner_point_memory_size = 0;
-    log_Steiner_point_divide_and_conquer_helper(mesh, source, destination, path, Steiner_point_epsilon, max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint, total_building_time, total_Steiner_point_time, total_Steiner_point_memory_size);
+    std::unordered_map<int, double> input_dist;
+    std::unordered_map<int, int> input_prev_node;
+    std::unordered_map<int, int> input_src_index;
+    std::unordered_map<int, double> output_dist;
+    std::unordered_map<int, int> output_prev_node;
+    std::unordered_map<int, int> output_src_index;
+    input_dist.clear();
+    input_prev_node.clear();
+    input_src_index.clear();
+    output_dist.clear();
+    output_prev_node.clear();
+    output_src_index.clear();
+    fixed_Steiner_point_divide_and_conquer_helper(mesh, source, destination, path, Steiner_point_epsilon, removing_value,
+                                                  estimate_path_length, max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint,
+                                                  total_building_time, total_Steiner_point_time, total_Steiner_point_memory_size,
+                                                  input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
     total_Steiner_point_query_time = total_Steiner_point_time - total_building_time;
 
     double snell_law_delta;
@@ -2263,7 +3497,424 @@ void log_Steiner_point_divide_and_conquer_and_binary_search_snell_law(geodesic::
     segment_path_list.push_back(one_segment_path);
     one_segment_path.clear();
 
-    std::cout << "segment path list size: " << segment_path_list.size() << std::endl;
+    double total_snell_law_query_time = 0;
+    int total_binary_search_of_snell_law_path_count = 0;
+    double total_snell_law_memory_size = 0;
+    int total_edge_sequence_size = 0;
+
+    result_path.push_back(destination);
+
+    for (int i = 0; i < segment_path_list.size(); ++i)
+    {
+        if (segment_path_list[i].size() > 2)
+        {
+            std::vector<geodesic::Edge> edge_sequence;
+            std::vector<geodesic::Face> face_sequence;
+            std::vector<geodesic::SurfacePoint> snell_law_path;
+
+            get_edge_sequence(mesh, segment_path_list[i], edge_sequence);
+            get_face_sequence(mesh, segment_path_list[i], face_sequence);
+            total_edge_sequence_size += edge_sequence.size();
+
+            int binary_search_of_snell_law_path_count = 0;
+
+            auto start = std::chrono::high_resolution_clock::now();
+
+            baseline_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta, binary_search_of_snell_law_path_count, total_snell_law_memory_size, 1);
+
+            auto stop = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+
+            total_snell_law_query_time += duration.count();
+
+            total_binary_search_of_snell_law_path_count += binary_search_of_snell_law_path_count;
+
+            for (int j = snell_law_path.size() - 2; j >= 0; --j)
+            {
+                result_path.push_back(snell_law_path[j]);
+            }
+        }
+        else if (segment_path_list[i].size() <= 2)
+        {
+            result_path.push_back(segment_path_list[i][1]);
+        }
+    }
+
+    total_snell_law_memory_size += result_path.size() * sizeof(geodesic::SurfacePoint);
+
+    double total_distance_snell_law;
+    total_distance_snell_law = path_distance(result_path, path);
+    std::cout << "Fixed Steiner point, divide and conquer and binary search snell law distance: " << total_distance_snell_law << std::endl;
+
+    double total_distance_Steiner_point;
+    total_distance_Steiner_point = path_distance(path, path);
+    if (total_distance_Steiner_point < total_distance_snell_law)
+    {
+        result_path.clear();
+        for (int i = 0; i < path.size(); ++i)
+        {
+            result_path.push_back(path[i]);
+        }
+        total_distance_snell_law = total_distance_Steiner_point;
+        std::cout << "Fixed Steiner point distance is shorter" << std::endl;
+    }
+
+    bool need_further_refine;
+    checking_distance(Steiner_point_epsilon, removing_value, total_distance_Steiner_point, total_distance_snell_law, need_further_refine);
+    double building_time_refined = 0;
+    double Steiner_point_query_time_refined = 0;
+    double Steiner_point_memory_size_refined = 0;
+    if (need_further_refine)
+    {
+        path.clear();
+        if (!pruned_Dijkstra)
+        {
+            output_dist.clear();
+            output_prev_node.clear();
+            output_src_index.clear();
+        }
+        fixed_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, 0, estimate_path_length, building_time_refined, Steiner_point_query_time_refined, Steiner_point_memory_size_refined,
+                            output_dist, output_prev_node, output_src_index, input_dist, input_prev_node, input_src_index);
+        result_path.clear();
+        for (int i = 0; i < path.size(); ++i)
+        {
+            result_path.push_back(path[i]);
+        }
+        total_distance_snell_law = path_distance(path, path);
+    }
+
+    double distance_error = total_distance_snell_law / total_distance_exact_path - 1;
+
+    std::cout << "# Summary #" << std::endl;
+    std::cout << "Dataset, datasize, epsilon, removing value: " << write_file_header << std::endl;
+    std::cout << "Total fixed Steiner point building time: " << total_building_time << " milliseconds" << std::endl;
+    std::cout << "Total rough fixed Steiner point (with divide and conquer) query time: " << total_Steiner_point_query_time << " milliseconds" << std::endl;
+    std::cout << "Total binary search snell law query time: " << total_snell_law_query_time << " milliseconds" << std::endl;
+    std::cout << "Total refined fixed Steiner point query time: " << Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total query time: " << total_Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total rough fixed Steiner point (with divide and conquer) memory usage: " << total_Steiner_point_memory_size / 1e6 << " MB" << std::endl;
+    std::cout << "Total binary search snell law path memory usage: " << total_snell_law_memory_size / 1e6 << " MB" << std::endl;
+    std::cout << "Total refined fixed Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
+    std::cout << "Total memory usage: " << (total_Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
+    std::cout << "Total binary search snell law path count: " << total_binary_search_of_snell_law_path_count << std::endl;
+    std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    std::cout << "Total distance: " << total_distance_snell_law << std::endl;
+    std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
+
+    std::ofstream ofs("../output/output.txt", std::ios_base::app);
+    if (pruned_Dijkstra)
+    {
+        ofs << "== Roug - Ref (., FixSP, ., NoEffWeig) ==\n";
+    }
+    else
+    {
+        ofs << "== Roug - Ref (NoPrunDijk, FixSP, ., NoEffWeig) ==\n";
+    }
+    ofs << write_file_header << "\t"
+        << total_building_time << "\t"
+        << total_Steiner_point_query_time << "\t"
+        << total_snell_law_query_time << "\t"
+        << Steiner_point_query_time_refined << "\t"
+        << total_Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << "\t"
+        << total_Steiner_point_memory_size / 1e6 << "\t"
+        << total_snell_law_memory_size / 1e6 << "\t"
+        << Steiner_point_memory_size_refined / 1e6 << "\t"
+        << (total_Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << "\t"
+        << total_binary_search_of_snell_law_path_count << "\t"
+        << distance_error * 100 << "\t"
+        << total_distance_snell_law << "\t"
+        << total_edge_sequence_size << "\n\n";
+    ofs.close();
+}
+
+// the fixed Steiner point algorithm and divide and conquer with effective weight snell law with or without pruned Dijkstra
+void fixed_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(
+    geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
+    geodesic::SurfacePoint &destination,
+    std::vector<geodesic::SurfacePoint> &path,
+    std::string write_file_header,
+    double Steiner_point_epsilon, int removing_value,
+    int estimate_path_length,
+    double snell_law_epsilon,
+    int max_loop_num_for_divide_and_conquer,
+    int max_loop_num_for_single_endpoint,
+    double total_distance_exact_path,
+    std::vector<geodesic::SurfacePoint> &result_path,
+    bool pruned_Dijkstra)
+{
+    double total_building_time = 0;
+    double total_Steiner_point_time;
+    double total_Steiner_point_query_time;
+    double total_Steiner_point_memory_size = 0;
+    std::unordered_map<int, double> input_dist;
+    std::unordered_map<int, int> input_prev_node;
+    std::unordered_map<int, int> input_src_index;
+    std::unordered_map<int, double> output_dist;
+    std::unordered_map<int, int> output_prev_node;
+    std::unordered_map<int, int> output_src_index;
+    input_dist.clear();
+    input_prev_node.clear();
+    input_src_index.clear();
+    output_dist.clear();
+    output_prev_node.clear();
+    output_src_index.clear();
+    fixed_Steiner_point_divide_and_conquer_helper(mesh, source, destination, path, Steiner_point_epsilon, removing_value,
+                                                  estimate_path_length, max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint,
+                                                  total_building_time, total_Steiner_point_time, total_Steiner_point_memory_size,
+                                                  input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
+    total_Steiner_point_query_time = total_Steiner_point_time - total_building_time;
+
+    double snell_law_delta;
+    snell_law_epsilon_to_delta(mesh, snell_law_epsilon, path.size() - 1, snell_law_delta);
+
+    // when the path calculated after the divide and conquer still passes the vertex, we cannot
+    // use such a path in the snell law, so we need to pick the segment of the path that passes
+    // between two vertices, and apply snell law on such a segment, then combine these segments
+    // together in the final path result
+
+    std::vector<geodesic::SurfacePoint> segment_source_list;
+    std::vector<geodesic::SurfacePoint> segment_destination_list;
+    std::vector<std::vector<geodesic::SurfacePoint>> segment_path_list;
+    std::vector<geodesic::SurfacePoint> one_segment_path;
+
+    segment_source_list.clear();
+    segment_destination_list.clear();
+    segment_path_list.clear();
+    one_segment_path.clear();
+
+    // we are moving from destination to source
+    segment_destination_list.push_back(destination);
+    one_segment_path.push_back(destination);
+
+    for (int i = 1; i < path.size() - 1; ++i)
+    {
+        geodesic::SurfacePoint &s = path[i];
+
+        if (s.type() == geodesic::EDGE)
+        {
+            one_segment_path.push_back(s);
+        }
+        else if (s.type() == geodesic::VERTEX)
+        {
+            segment_source_list.push_back(s);
+            one_segment_path.push_back(s);
+            segment_path_list.push_back(one_segment_path);
+            one_segment_path.clear();
+            segment_destination_list.push_back(s);
+            one_segment_path.push_back(s);
+        }
+    }
+
+    segment_source_list.push_back(source);
+    one_segment_path.push_back(source);
+    segment_path_list.push_back(one_segment_path);
+    one_segment_path.clear();
+
+    double total_snell_law_query_time = 0;
+    int total_binary_search_and_effective_weight_of_snell_law_path_count = 0;
+    double total_snell_law_memory_size = 0;
+    int total_edge_sequence_size = 0;
+
+    result_path.push_back(destination);
+
+    for (int i = 0; i < segment_path_list.size(); ++i)
+    {
+        if (segment_path_list[i].size() > 2)
+        {
+            std::vector<geodesic::Edge> edge_sequence;
+            std::vector<geodesic::Face> face_sequence;
+            std::vector<geodesic::SurfacePoint> snell_law_path;
+
+            get_edge_sequence(mesh, segment_path_list[i], edge_sequence);
+            get_face_sequence(mesh, segment_path_list[i], face_sequence);
+            total_edge_sequence_size += edge_sequence.size();
+
+            int binary_search_and_effective_weight_of_snell_law_path_count = 0;
+
+            auto start = std::chrono::high_resolution_clock::now();
+
+            effective_weight_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta, binary_search_and_effective_weight_of_snell_law_path_count, total_snell_law_memory_size, 1);
+
+            auto stop = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+
+            total_snell_law_query_time += duration.count();
+
+            total_binary_search_and_effective_weight_of_snell_law_path_count += binary_search_and_effective_weight_of_snell_law_path_count;
+
+            for (int j = snell_law_path.size() - 2; j >= 0; --j)
+            {
+                result_path.push_back(snell_law_path[j]);
+            }
+        }
+        else if (segment_path_list[i].size() <= 2)
+        {
+            result_path.push_back(segment_path_list[i][1]);
+        }
+    }
+
+    total_snell_law_memory_size += result_path.size() * sizeof(geodesic::SurfacePoint);
+
+    double total_distance_snell_law;
+    total_distance_snell_law = path_distance(result_path, path);
+    std::cout << "Fixed Steiner point, divide and conquer and effective weight snell law distance: " << total_distance_snell_law << std::endl;
+
+    double total_distance_Steiner_point;
+    total_distance_Steiner_point = path_distance(path, path);
+    if (total_distance_Steiner_point < total_distance_snell_law)
+    {
+        result_path.clear();
+        for (int i = 0; i < path.size(); ++i)
+        {
+            result_path.push_back(path[i]);
+        }
+        total_distance_snell_law = total_distance_Steiner_point;
+        std::cout << "Fixed Steiner point distance is shorter" << std::endl;
+    }
+
+    bool need_further_refine;
+    checking_distance(Steiner_point_epsilon, removing_value, total_distance_Steiner_point, total_distance_snell_law, need_further_refine);
+    double building_time_refined = 0;
+    double Steiner_point_query_time_refined = 0;
+    double Steiner_point_memory_size_refined = 0;
+    if (need_further_refine)
+    {
+        path.clear();
+        if (!pruned_Dijkstra)
+        {
+            output_dist.clear();
+            output_prev_node.clear();
+            output_src_index.clear();
+        }
+        fixed_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, 0, estimate_path_length, building_time_refined, Steiner_point_query_time_refined, Steiner_point_memory_size_refined,
+                            output_dist, output_prev_node, output_src_index, input_dist, input_prev_node, input_src_index);
+        result_path.clear();
+        for (int i = 0; i < path.size(); ++i)
+        {
+            result_path.push_back(path[i]);
+        }
+        total_distance_snell_law = path_distance(path, path);
+    }
+
+    double distance_error = total_distance_snell_law / total_distance_exact_path - 1;
+
+    std::cout << "# Summary #" << std::endl;
+    std::cout << "Dataset, datasize, epsilon, removing value: " << write_file_header << std::endl;
+    std::cout << "Total fixed Steiner point building time: " << total_building_time << " milliseconds" << std::endl;
+    std::cout << "Total rough fixed Steiner point (with divide and conquer) query time: " << total_Steiner_point_query_time << " milliseconds" << std::endl;
+    std::cout << "Total effective weight snell law query time: " << total_snell_law_query_time << " milliseconds" << std::endl;
+    std::cout << "Total refined fixed Steiner point query time: " << Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total query time: " << total_Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total rough fixed Steiner point (with divide and conquer) memory usage: " << total_Steiner_point_memory_size / 1e6 << " MB" << std::endl;
+    std::cout << "Total binary search and effective weight snell law path memory usage: " << total_snell_law_memory_size / 1e6 << " MB" << std::endl;
+    std::cout << "Total refined fixed Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
+    std::cout << "Total memory usage: " << (total_Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
+    std::cout << "Total binary search and effective weight snell law path count: " << total_binary_search_and_effective_weight_of_snell_law_path_count << std::endl;
+    std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    std::cout << "Total distance: " << total_distance_snell_law << std::endl;
+    std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
+
+    std::ofstream ofs("../output/output.txt", std::ios_base::app);
+    if (pruned_Dijkstra)
+    {
+        ofs << "== Roug - Ref (., FixSP, ., .) ==\n";
+    }
+    else
+    {
+        ofs << "== Roug - Ref (NoPrunDijk, FixSP, ., .) ==\n";
+    }
+    ofs << write_file_header << "\t"
+        << total_building_time << "\t"
+        << total_Steiner_point_query_time << "\t"
+        << total_snell_law_query_time << "\t"
+        << Steiner_point_query_time_refined << "\t"
+        << total_Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << "\t"
+        << total_Steiner_point_memory_size / 1e6 << "\t"
+        << total_snell_law_memory_size / 1e6 << "\t"
+        << Steiner_point_memory_size_refined / 1e6 << "\t"
+        << (total_Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << "\t"
+        << total_binary_search_and_effective_weight_of_snell_law_path_count << "\t"
+        << distance_error * 100 << "\t"
+        << total_distance_snell_law << "\t"
+        << total_edge_sequence_size << "\n\n";
+    ofs.close();
+}
+
+// the log Steiner point algorithm (without divide and conquer) with binary_search snell law with or without pruned Dijkstra
+void log_Steiner_point_and_binary_search_snell_law(
+    geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
+    geodesic::SurfacePoint &destination,
+    std::vector<geodesic::SurfacePoint> &path,
+    std::string write_file_header,
+    double Steiner_point_epsilon, int removing_value,
+    double snell_law_epsilon, double total_distance_exact_path,
+    std::vector<geodesic::SurfacePoint> &result_path,
+    bool pruned_Dijkstra)
+{
+    double building_time;
+    double Steiner_point_query_time;
+    double Steiner_point_memory_size;
+    std::unordered_map<int, double> input_dist;
+    std::unordered_map<int, int> input_prev_node;
+    std::unordered_map<int, int> input_src_index;
+    std::unordered_map<int, double> output_dist;
+    std::unordered_map<int, int> output_prev_node;
+    std::unordered_map<int, int> output_src_index;
+    input_dist.clear();
+    input_prev_node.clear();
+    input_src_index.clear();
+    output_dist.clear();
+    output_prev_node.clear();
+    output_src_index.clear();
+    log_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, removing_value,
+                      building_time, Steiner_point_query_time, Steiner_point_memory_size,
+                      input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
+
+    double snell_law_delta;
+    snell_law_epsilon_to_delta(mesh, snell_law_epsilon, path.size() - 1, snell_law_delta);
+
+    // when the path calculated after the Steiner point algorithm passes the vertex, we cannot
+    // use such a path in the snell law, so we need to pick the segment of the path that passes
+    // between two vertices, and apply snell law on such a segment, then combine these segments
+    // together in the final path result
+
+    std::vector<geodesic::SurfacePoint> segment_source_list;
+    std::vector<geodesic::SurfacePoint> segment_destination_list;
+    std::vector<std::vector<geodesic::SurfacePoint>> segment_path_list;
+    std::vector<geodesic::SurfacePoint> one_segment_path;
+
+    segment_source_list.clear();
+    segment_destination_list.clear();
+    segment_path_list.clear();
+    one_segment_path.clear();
+
+    // we are moving from destination to source
+    segment_destination_list.push_back(destination);
+    one_segment_path.push_back(destination);
+
+    for (int i = 1; i < path.size() - 1; ++i)
+    {
+        geodesic::SurfacePoint &s = path[i];
+
+        if (s.type() == geodesic::EDGE)
+        {
+            one_segment_path.push_back(s);
+        }
+        else if (s.type() == geodesic::VERTEX)
+        {
+            segment_source_list.push_back(s);
+            one_segment_path.push_back(s);
+            segment_path_list.push_back(one_segment_path);
+            one_segment_path.clear();
+            segment_destination_list.push_back(s);
+            one_segment_path.push_back(s);
+        }
+    }
+
+    segment_source_list.push_back(source);
+    one_segment_path.push_back(source);
+    segment_path_list.push_back(one_segment_path);
+    one_segment_path.clear();
 
     double total_snell_law_query_time = 0;
     int total_binary_search_of_snell_law_path_count = 0;
@@ -2288,19 +3939,437 @@ void log_Steiner_point_divide_and_conquer_and_binary_search_snell_law(geodesic::
 
             auto start = std::chrono::high_resolution_clock::now();
 
-            baseline_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta, binary_search_of_snell_law_path_count, total_snell_law_memory_size);
+            baseline_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta, binary_search_of_snell_law_path_count, total_snell_law_memory_size, segment_path_list.size());
+            double a, b, c;
+            // baseline_binary_search_one_time_of_one_edge(mesh, edge_sequence, face_sequence, segment_source_list[i].x(), segment_source_list[i].y(), segment_source_list[i].z(), segment_destination_list[i], snell_law_path, snell_law_delta, a, b, c, binary_search_of_snell_law_path_count);
 
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
 
             total_snell_law_query_time += duration.count();
-            std::cout << "Binary search snell law query time: " << duration.count() << " milliseconds" << std::endl;
 
             total_binary_search_of_snell_law_path_count += binary_search_of_snell_law_path_count;
 
             for (int j = snell_law_path.size() - 2; j >= 0; --j)
             {
-                // std::cout << snell_law_path[j].x() << "\t" << snell_law_path[j].y() << "\t" << snell_law_path[j].z() << std::endl;
+                result_path.push_back(snell_law_path[j]);
+            }
+        }
+        else if (segment_path_list[i].size() <= 2)
+        {
+            result_path.push_back(segment_path_list[i][1]);
+        }
+    }
+
+    total_snell_law_memory_size += result_path.size() * sizeof(geodesic::SurfacePoint);
+
+    double total_distance_snell_law;
+    total_distance_snell_law = path_distance(result_path, path);
+    std::cout << "Log Steiner point and binary search snell law distance: " << total_distance_snell_law << std::endl;
+
+    double total_distance_Steiner_point;
+    total_distance_Steiner_point = path_distance(path, path);
+    if (total_distance_Steiner_point < total_distance_snell_law)
+    {
+        result_path.clear();
+        for (int i = 0; i < path.size(); ++i)
+        {
+            result_path.push_back(path[i]);
+        }
+        total_distance_snell_law = total_distance_Steiner_point;
+        std::cout << "Log Steiner point distance is shorter" << std::endl;
+    }
+
+    bool need_further_refine;
+    checking_distance(Steiner_point_epsilon, removing_value, total_distance_Steiner_point, total_distance_snell_law, need_further_refine);
+    double building_time_refined = 0;
+    double Steiner_point_query_time_refined = 0;
+    double Steiner_point_memory_size_refined = 0;
+    if (need_further_refine)
+    {
+        path.clear();
+        if (!pruned_Dijkstra)
+        {
+            output_dist.clear();
+            output_prev_node.clear();
+            output_src_index.clear();
+        }
+        log_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, 0, building_time_refined, Steiner_point_query_time_refined, Steiner_point_memory_size_refined,
+                          output_dist, output_prev_node, output_src_index, input_dist, input_prev_node, input_src_index);
+        result_path.clear();
+        for (int i = 0; i < path.size(); ++i)
+        {
+            result_path.push_back(path[i]);
+        }
+        total_distance_snell_law = path_distance(path, path);
+    }
+
+    double distance_error = total_distance_snell_law / total_distance_exact_path - 1;
+
+    std::cout << "# Summary #" << std::endl;
+    std::cout << "Dataset, datasize, epsilon, removing value: " << write_file_header << std::endl;
+    std::cout << "Total log Steiner point building time: " << building_time << " milliseconds" << std::endl;
+    std::cout << "Total rough log Steiner point (without divide and conquer) query time: " << Steiner_point_query_time << " milliseconds" << std::endl;
+    std::cout << "Total binary search snell law query time: " << total_snell_law_query_time << " milliseconds" << std::endl;
+    std::cout << "Total refined log Steiner point query time: " << Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total query time: " << Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total rough log Steiner point (without divide and conquer) memory usage: " << Steiner_point_memory_size / 1e6 << " MB" << std::endl;
+    std::cout << "Total binary search and binary search snell law path memory usage: " << total_snell_law_memory_size / 1e6 << " MB" << std::endl;
+    std::cout << "Total refined log Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
+    std::cout << "Total memory usage: " << (Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
+    std::cout << "Total binary search and binary search snell law path count: " << total_binary_search_of_snell_law_path_count << std::endl;
+    std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    std::cout << "Total distance: " << total_distance_snell_law << std::endl;
+    std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
+
+    std::ofstream ofs("../output/output.txt", std::ios_base::app);
+    if (pruned_Dijkstra)
+    {
+        ofs << "== Roug - Ref (., ., NoEdgSeqConv, NoEffWeig) ==\n";
+    }
+    else
+    {
+        ofs << "== Roug - Ref (NoPrunDijk, ., NoEdgSeqConv, NoEffWeig) ==\n";
+    }
+    ofs << write_file_header << "\t"
+        << building_time << "\t"
+        << Steiner_point_query_time << "\t"
+        << total_snell_law_query_time << "\t"
+        << Steiner_point_query_time_refined << "\t"
+        << Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << "\t"
+        << Steiner_point_memory_size / 1e6 << "\t"
+        << total_snell_law_memory_size / 1e6 << "\t"
+        << Steiner_point_memory_size_refined / 1e6 << "\t"
+        << (Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << "\t"
+        << total_binary_search_of_snell_law_path_count << "\t"
+        << distance_error * 100 << "\t"
+        << total_distance_snell_law << "\t"
+        << total_edge_sequence_size << "\n\n";
+    ofs.close();
+}
+
+// the log Steiner point algorithm (without divide and conquer) with effective weight snell law with or without pruned Dijkstra
+void log_Steiner_point_and_effective_weight_snell_law(
+    geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
+    geodesic::SurfacePoint &destination,
+    std::vector<geodesic::SurfacePoint> &path,
+    std::string write_file_header,
+    double Steiner_point_epsilon, int removing_value,
+    double snell_law_epsilon, double total_distance_exact_path,
+    std::vector<geodesic::SurfacePoint> &result_path,
+    bool pruned_Dijkstra)
+{
+    double building_time;
+    double Steiner_point_query_time;
+    double Steiner_point_memory_size;
+    std::unordered_map<int, double> input_dist;
+    std::unordered_map<int, int> input_prev_node;
+    std::unordered_map<int, int> input_src_index;
+    std::unordered_map<int, double> output_dist;
+    std::unordered_map<int, int> output_prev_node;
+    std::unordered_map<int, int> output_src_index;
+    input_dist.clear();
+    input_prev_node.clear();
+    input_src_index.clear();
+    output_dist.clear();
+    output_prev_node.clear();
+    output_src_index.clear();
+    log_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, removing_value,
+                      building_time, Steiner_point_query_time, Steiner_point_memory_size,
+                      input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
+
+    double snell_law_delta;
+    snell_law_epsilon_to_delta(mesh, snell_law_epsilon, path.size() - 1, snell_law_delta);
+
+    // when the path calculated after the Steiner point algorithm passes the vertex, we cannot
+    // use such a path in the snell law, so we need to pick the segment of the path that passes
+    // between two vertices, and apply snell law on such a segment, then combine these segments
+    // together in the final path result
+
+    std::vector<geodesic::SurfacePoint> segment_source_list;
+    std::vector<geodesic::SurfacePoint> segment_destination_list;
+    std::vector<std::vector<geodesic::SurfacePoint>> segment_path_list;
+    std::vector<geodesic::SurfacePoint> one_segment_path;
+
+    segment_source_list.clear();
+    segment_destination_list.clear();
+    segment_path_list.clear();
+    one_segment_path.clear();
+
+    // we are moving from destination to source
+    segment_destination_list.push_back(destination);
+    one_segment_path.push_back(destination);
+
+    for (int i = 1; i < path.size() - 1; ++i)
+    {
+        geodesic::SurfacePoint &s = path[i];
+
+        if (s.type() == geodesic::EDGE)
+        {
+            one_segment_path.push_back(s);
+        }
+        else if (s.type() == geodesic::VERTEX)
+        {
+            segment_source_list.push_back(s);
+            one_segment_path.push_back(s);
+            segment_path_list.push_back(one_segment_path);
+            one_segment_path.clear();
+            segment_destination_list.push_back(s);
+            one_segment_path.push_back(s);
+        }
+    }
+
+    segment_source_list.push_back(source);
+    one_segment_path.push_back(source);
+    segment_path_list.push_back(one_segment_path);
+    one_segment_path.clear();
+
+    double total_snell_law_query_time = 0;
+    int total_binary_search_and_effective_weight_of_snell_law_path_count = 0;
+    double total_snell_law_memory_size = 0;
+    int total_edge_sequence_size = 0;
+
+    result_path.push_back(destination);
+
+    for (int i = 0; i < segment_path_list.size(); ++i)
+    {
+        if (segment_path_list[i].size() > 2)
+        {
+            std::vector<geodesic::Edge> edge_sequence;
+            std::vector<geodesic::Face> face_sequence;
+            std::vector<geodesic::SurfacePoint> snell_law_path;
+
+            get_edge_sequence(mesh, segment_path_list[i], edge_sequence);
+            get_face_sequence(mesh, segment_path_list[i], face_sequence);
+            total_edge_sequence_size += edge_sequence.size();
+
+            int binary_search_and_effective_weight_of_snell_law_path_count = 0;
+
+            auto start = std::chrono::high_resolution_clock::now();
+
+            effective_weight_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta, binary_search_and_effective_weight_of_snell_law_path_count, total_snell_law_memory_size, segment_path_list.size());
+
+            auto stop = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+
+            total_snell_law_query_time += duration.count();
+
+            total_binary_search_and_effective_weight_of_snell_law_path_count += binary_search_and_effective_weight_of_snell_law_path_count;
+
+            for (int j = snell_law_path.size() - 2; j >= 0; --j)
+            {
+                result_path.push_back(snell_law_path[j]);
+            }
+        }
+        else if (segment_path_list[i].size() <= 2)
+        {
+            result_path.push_back(segment_path_list[i][1]);
+        }
+    }
+
+    total_snell_law_memory_size += result_path.size() * sizeof(geodesic::SurfacePoint);
+
+    double total_distance_snell_law;
+    total_distance_snell_law = path_distance(result_path, path);
+    std::cout << "Log Steiner point and effective weight snell law distance: " << total_distance_snell_law << std::endl;
+
+    double total_distance_Steiner_point;
+    total_distance_Steiner_point = path_distance(path, path);
+    if (total_distance_Steiner_point < total_distance_snell_law)
+    {
+        result_path.clear();
+        for (int i = 0; i < path.size(); ++i)
+        {
+            result_path.push_back(path[i]);
+        }
+        total_distance_snell_law = total_distance_Steiner_point;
+        std::cout << "Log Steiner point distance is shorter" << std::endl;
+    }
+
+    bool need_further_refine;
+    checking_distance(Steiner_point_epsilon, removing_value, total_distance_Steiner_point, total_distance_snell_law, need_further_refine);
+    double building_time_refined = 0;
+    double Steiner_point_query_time_refined = 0;
+    double Steiner_point_memory_size_refined = 0;
+    if (need_further_refine)
+    {
+        path.clear();
+        if (!pruned_Dijkstra)
+        {
+            output_dist.clear();
+            output_prev_node.clear();
+            output_src_index.clear();
+        }
+        log_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, 0, building_time_refined, Steiner_point_query_time_refined, Steiner_point_memory_size_refined,
+                          output_dist, output_prev_node, output_src_index, input_dist, input_prev_node, input_src_index);
+        result_path.clear();
+        for (int i = 0; i < path.size(); ++i)
+        {
+            result_path.push_back(path[i]);
+        }
+        total_distance_snell_law = path_distance(path, path);
+    }
+
+    double distance_error = total_distance_snell_law / total_distance_exact_path - 1;
+
+    std::cout << "# Summary #" << std::endl;
+    std::cout << "Dataset, datasize, epsilon, removing value: " << write_file_header << std::endl;
+    std::cout << "Total log Steiner point building time: " << building_time << " milliseconds" << std::endl;
+    std::cout << "Total rough log Steiner point (without divide and conquer) query time: " << Steiner_point_query_time << " milliseconds" << std::endl;
+    std::cout << "Total effective weight snell law query time: " << total_snell_law_query_time << " milliseconds" << std::endl;
+    std::cout << "Total refined log Steiner point query time: " << Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total query time: " << Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total rough log Steiner point (without divide and conquer) memory usage: " << Steiner_point_memory_size / 1e6 << " MB" << std::endl;
+    std::cout << "Total binary search and effective weight snell law path memory usage: " << total_snell_law_memory_size / 1e6 << " MB" << std::endl;
+    std::cout << "Total refined log Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
+    std::cout << "Total memory usage: " << (Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
+    std::cout << "Total binary search and effective weight snell law path count: " << total_binary_search_and_effective_weight_of_snell_law_path_count << std::endl;
+    std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    std::cout << "Total distance: " << total_distance_snell_law << std::endl;
+    std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
+
+    std::ofstream ofs("../output/output.txt", std::ios_base::app);
+    if (pruned_Dijkstra)
+    {
+        ofs << "== Roug - Ref (., ., NoEdgSeqConv, .) ==\n";
+    }
+    else
+    {
+        ofs << "== Roug - Ref (NoPrunDijk, ., NoEdgSeqConv, .) ==\n";
+    }
+    ofs << write_file_header << "\t"
+        << building_time << "\t"
+        << Steiner_point_query_time << "\t"
+        << total_snell_law_query_time << "\t"
+        << Steiner_point_query_time_refined << "\t"
+        << Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << "\t"
+        << Steiner_point_memory_size / 1e6 << "\t"
+        << total_snell_law_memory_size / 1e6 << "\t"
+        << Steiner_point_memory_size_refined / 1e6 << "\t"
+        << (Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << "\t"
+        << total_binary_search_and_effective_weight_of_snell_law_path_count << "\t"
+        << distance_error * 100 << "\t"
+        << total_distance_snell_law << "\t"
+        << total_edge_sequence_size << "\n\n";
+    ofs.close();
+}
+
+// the log Steiner point algorithm and divide and conquer with binary search snell law with or without pruned Dijkstra
+void log_Steiner_point_divide_and_conquer_and_binary_search_snell_law(
+    geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
+    geodesic::SurfacePoint &destination,
+    std::vector<geodesic::SurfacePoint> &path,
+    std::string write_file_header,
+    double Steiner_point_epsilon, int removing_value,
+    double snell_law_epsilon,
+    int max_loop_num_for_divide_and_conquer,
+    int max_loop_num_for_single_endpoint,
+    double total_distance_exact_path,
+    std::vector<geodesic::SurfacePoint> &result_path,
+    bool pruned_Dijkstra)
+{
+    double total_building_time = 0;
+    double total_Steiner_point_time;
+    double total_Steiner_point_query_time;
+    double total_Steiner_point_memory_size = 0;
+    std::unordered_map<int, double> input_dist;
+    std::unordered_map<int, int> input_prev_node;
+    std::unordered_map<int, int> input_src_index;
+    std::unordered_map<int, double> output_dist;
+    std::unordered_map<int, int> output_prev_node;
+    std::unordered_map<int, int> output_src_index;
+    input_dist.clear();
+    input_prev_node.clear();
+    input_src_index.clear();
+    output_dist.clear();
+    output_prev_node.clear();
+    output_src_index.clear();
+    log_Steiner_point_divide_and_conquer_helper(mesh, source, destination, path, Steiner_point_epsilon, removing_value,
+                                                max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint, total_building_time,
+                                                total_Steiner_point_time, total_Steiner_point_memory_size,
+                                                input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
+    total_Steiner_point_query_time = total_Steiner_point_time - total_building_time;
+
+    double snell_law_delta;
+    snell_law_epsilon_to_delta(mesh, snell_law_epsilon, path.size() - 1, snell_law_delta);
+
+    // when the path calculated after the divide and conquer still passes the vertex, we cannot
+    // use such a path in the snell law, so we need to pick the segment of the path that passes
+    // between two vertices, and apply snell law on such a segment, then combine these segments
+    // together in the final path result
+
+    std::vector<geodesic::SurfacePoint> segment_source_list;
+    std::vector<geodesic::SurfacePoint> segment_destination_list;
+    std::vector<std::vector<geodesic::SurfacePoint>> segment_path_list;
+    std::vector<geodesic::SurfacePoint> one_segment_path;
+
+    segment_source_list.clear();
+    segment_destination_list.clear();
+    segment_path_list.clear();
+    one_segment_path.clear();
+
+    // we are moving from destination to source
+    segment_destination_list.push_back(destination);
+    one_segment_path.push_back(destination);
+
+    for (int i = 1; i < path.size() - 1; ++i)
+    {
+        geodesic::SurfacePoint &s = path[i];
+
+        if (s.type() == geodesic::EDGE)
+        {
+            one_segment_path.push_back(s);
+        }
+        else if (s.type() == geodesic::VERTEX)
+        {
+            segment_source_list.push_back(s);
+            one_segment_path.push_back(s);
+            segment_path_list.push_back(one_segment_path);
+            one_segment_path.clear();
+            segment_destination_list.push_back(s);
+            one_segment_path.push_back(s);
+        }
+    }
+
+    segment_source_list.push_back(source);
+    one_segment_path.push_back(source);
+    segment_path_list.push_back(one_segment_path);
+    one_segment_path.clear();
+
+    double total_snell_law_query_time = 0;
+    int total_binary_search_of_snell_law_path_count = 0;
+    double total_snell_law_memory_size = 0;
+    int total_edge_sequence_size = 0;
+
+    result_path.push_back(destination);
+
+    for (int i = 0; i < segment_path_list.size(); ++i)
+    {
+        if (segment_path_list[i].size() > 2)
+        {
+            std::vector<geodesic::Edge> edge_sequence;
+            std::vector<geodesic::Face> face_sequence;
+            std::vector<geodesic::SurfacePoint> snell_law_path;
+
+            get_edge_sequence(mesh, segment_path_list[i], edge_sequence);
+            get_face_sequence(mesh, segment_path_list[i], face_sequence);
+            total_edge_sequence_size += edge_sequence.size();
+
+            int binary_search_of_snell_law_path_count = 0;
+
+            auto start = std::chrono::high_resolution_clock::now();
+
+            baseline_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta, binary_search_of_snell_law_path_count, total_snell_law_memory_size, 1);
+
+            auto stop = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+
+            total_snell_law_query_time += duration.count();
+
+            total_binary_search_of_snell_law_path_count += binary_search_of_snell_law_path_count;
+
+            for (int j = snell_law_path.size() - 2; j >= 0; --j)
+            {
                 result_path.push_back(snell_law_path[j]);
             }
         }
@@ -2326,36 +4395,70 @@ void log_Steiner_point_divide_and_conquer_and_binary_search_snell_law(geodesic::
             result_path.push_back(path[i]);
         }
         total_distance_snell_law = total_distance_Steiner_point;
-        std::cout << "Log Steiner point distance is shorter, and the final distance is: " << total_distance_Steiner_point << std::endl;
+        std::cout << "Log Steiner point distance is shorter" << std::endl;
     }
 
-    fix_distance(total_distance_snell_law, total_distance_exact_path);
+    bool need_further_refine;
+    checking_distance(Steiner_point_epsilon, removing_value, total_distance_Steiner_point, total_distance_snell_law, need_further_refine);
+    double building_time_refined = 0;
+    double Steiner_point_query_time_refined = 0;
+    double Steiner_point_memory_size_refined = 0;
+    if (need_further_refine)
+    {
+        path.clear();
+        if (!pruned_Dijkstra)
+        {
+            output_dist.clear();
+            output_prev_node.clear();
+            output_src_index.clear();
+        }
+        log_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, 0, building_time_refined, Steiner_point_query_time_refined, Steiner_point_memory_size_refined,
+                          output_dist, output_prev_node, output_src_index, input_dist, input_prev_node, input_src_index);
+        result_path.clear();
+        for (int i = 0; i < path.size(); ++i)
+        {
+            result_path.push_back(path[i]);
+        }
+        total_distance_snell_law = path_distance(path, path);
+    }
+
     double distance_error = total_distance_snell_law / total_distance_exact_path - 1;
 
     std::cout << "# Summary #" << std::endl;
-    std::cout << "Dataset, datasize, epsilon, epsilon_SP, epsilon_SL: " << write_file_header << std::endl;
+    std::cout << "Dataset, datasize, epsilon, removing value: " << write_file_header << std::endl;
     std::cout << "Total log Steiner point building time: " << total_building_time << " milliseconds" << std::endl;
-    std::cout << "Total log Steiner point (with divide and conquer) query time: " << total_Steiner_point_query_time << " milliseconds" << std::endl;
+    std::cout << "Total rough log Steiner point (with divide and conquer) query time: " << total_Steiner_point_query_time << " milliseconds" << std::endl;
     std::cout << "Total binary search snell law query time: " << total_snell_law_query_time << " milliseconds" << std::endl;
-    std::cout << "Total query time: " << total_Steiner_point_query_time + total_snell_law_query_time << " milliseconds" << std::endl;
-    std::cout << "Total log Steiner point (with divide and conquer) memory usage: " << total_Steiner_point_memory_size / 1e6 << " MB" << std::endl;
+    std::cout << "Total refined log Steiner point query time: " << Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total query time: " << total_Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total rough log Steiner point (with divide and conquer) memory usage: " << total_Steiner_point_memory_size / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search snell law path memory usage: " << total_snell_law_memory_size / 1e6 << " MB" << std::endl;
-    std::cout << "Total memory usage: " << (total_Steiner_point_memory_size + total_snell_law_memory_size) / 1e6 << " MB" << std::endl;
+    std::cout << "Total refined log Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
+    std::cout << "Total memory usage: " << (total_Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search snell law path count: " << total_binary_search_of_snell_law_path_count << std::endl;
     std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
     std::cout << "Total distance: " << total_distance_snell_law << std::endl;
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
     std::ofstream ofs("../output/output.txt", std::ios_base::app);
-    ofs << "== ProgLogSP-BinarySearch ==\n";
+    if (pruned_Dijkstra)
+    {
+        ofs << "== Roug - Ref (., ., ., NoEffWeig) ==\n";
+    }
+    else
+    {
+        ofs << "== Roug - Ref (NoPrunDijk, ., ., NoEffWeig) ==\n";
+    }
     ofs << write_file_header << "\t"
         << total_building_time << "\t"
         << total_Steiner_point_query_time << "\t"
         << total_snell_law_query_time << "\t"
-        << total_Steiner_point_query_time + total_snell_law_query_time << "\t"
+        << Steiner_point_query_time_refined << "\t"
+        << total_Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << "\t"
         << total_Steiner_point_memory_size / 1e6 << "\t"
         << total_snell_law_memory_size / 1e6 << "\t"
-        << (total_Steiner_point_memory_size + total_snell_law_memory_size) / 1e6 << "\t"
+        << Steiner_point_memory_size_refined / 1e6 << "\t"
+        << (total_Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << "\t"
         << total_binary_search_of_snell_law_path_count << "\t"
         << distance_error * 100 << "\t"
         << total_distance_snell_law << "\t"
@@ -2363,22 +4466,40 @@ void log_Steiner_point_divide_and_conquer_and_binary_search_snell_law(geodesic::
     ofs.close();
 }
 
-// the log Steiner point algorithm and divide and conquer with effective weight snell law
-void log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
-                                                                         geodesic::SurfacePoint &destination,
-                                                                         std::vector<geodesic::SurfacePoint> &path,
-                                                                         std::string write_file_header,
-                                                                         double Steiner_point_epsilon, double snell_law_epsilon,
-                                                                         int max_loop_num_for_divide_and_conquer,
-                                                                         int max_loop_num_for_single_endpoint,
-                                                                         double total_distance_exact_path,
-                                                                         std::vector<geodesic::SurfacePoint> &result_path)
+// the log Steiner point algorithm and divide and conquer with effective weight snell law with or without pruned Dijkstra
+void log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(
+    geodesic::Mesh *mesh, geodesic::SurfacePoint &source,
+    geodesic::SurfacePoint &destination,
+    std::vector<geodesic::SurfacePoint> &path,
+    std::string write_file_header,
+    double Steiner_point_epsilon, int removing_value,
+    double snell_law_epsilon,
+    int max_loop_num_for_divide_and_conquer,
+    int max_loop_num_for_single_endpoint,
+    double total_distance_exact_path,
+    std::vector<geodesic::SurfacePoint> &result_path,
+    bool pruned_Dijkstra)
 {
     double total_building_time = 0;
     double total_Steiner_point_time;
     double total_Steiner_point_query_time;
     double total_Steiner_point_memory_size = 0;
-    log_Steiner_point_divide_and_conquer_helper(mesh, source, destination, path, Steiner_point_epsilon, max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint, total_building_time, total_Steiner_point_time, total_Steiner_point_memory_size);
+    std::unordered_map<int, double> input_dist;
+    std::unordered_map<int, int> input_prev_node;
+    std::unordered_map<int, int> input_src_index;
+    std::unordered_map<int, double> output_dist;
+    std::unordered_map<int, int> output_prev_node;
+    std::unordered_map<int, int> output_src_index;
+    input_dist.clear();
+    input_prev_node.clear();
+    input_src_index.clear();
+    output_dist.clear();
+    output_prev_node.clear();
+    output_src_index.clear();
+    log_Steiner_point_divide_and_conquer_helper(mesh, source, destination, path, Steiner_point_epsilon, removing_value,
+                                                max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint, total_building_time,
+                                                total_Steiner_point_time, total_Steiner_point_memory_size,
+                                                input_dist, input_prev_node, input_src_index, output_dist, output_prev_node, output_src_index);
     total_Steiner_point_query_time = total_Steiner_point_time - total_building_time;
 
     double snell_law_delta;
@@ -2427,8 +4548,6 @@ void log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(geodesi
     segment_path_list.push_back(one_segment_path);
     one_segment_path.clear();
 
-    std::cout << "segment path list size: " << segment_path_list.size() << std::endl;
-
     double total_snell_law_query_time = 0;
     int total_binary_search_and_effective_weight_of_snell_law_path_count = 0;
     double total_snell_law_memory_size = 0;
@@ -2452,13 +4571,12 @@ void log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(geodesi
 
             auto start = std::chrono::high_resolution_clock::now();
 
-            effective_weight_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta * 20, binary_search_and_effective_weight_of_snell_law_path_count, total_snell_law_memory_size);
+            effective_weight_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta * 20, binary_search_and_effective_weight_of_snell_law_path_count, total_snell_law_memory_size, 1);
 
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
 
             total_snell_law_query_time += duration.count();
-            std::cout << "Effective weight snell law query time: " << duration.count() << " milliseconds" << std::endl;
 
             total_binary_search_and_effective_weight_of_snell_law_path_count += binary_search_and_effective_weight_of_snell_law_path_count;
 
@@ -2489,36 +4607,70 @@ void log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(geodesi
             result_path.push_back(path[i]);
         }
         total_distance_snell_law = total_distance_Steiner_point;
-        std::cout << "Log Steiner point distance is shorter, and the final distance is: " << total_distance_Steiner_point << std::endl;
+        std::cout << "Log Steiner point distance is shorter" << std::endl;
     }
 
-    fix_distance(total_distance_snell_law, total_distance_exact_path);
+    bool need_further_refine;
+    checking_distance(Steiner_point_epsilon, removing_value, total_distance_Steiner_point, total_distance_snell_law, need_further_refine);
+    double building_time_refined = 0;
+    double Steiner_point_query_time_refined = 0;
+    double Steiner_point_memory_size_refined = 0;
+    if (need_further_refine)
+    {
+        path.clear();
+        if (!pruned_Dijkstra)
+        {
+            output_dist.clear();
+            output_prev_node.clear();
+            output_src_index.clear();
+        }
+        log_Steiner_point(mesh, source, destination, path, Steiner_point_epsilon, 0, building_time_refined, Steiner_point_query_time_refined, Steiner_point_memory_size_refined,
+                          output_dist, output_prev_node, output_src_index, input_dist, input_prev_node, input_src_index);
+        result_path.clear();
+        for (int i = 0; i < path.size(); ++i)
+        {
+            result_path.push_back(path[i]);
+        }
+        total_distance_snell_law = path_distance(path, path);
+    }
+
     double distance_error = total_distance_snell_law / total_distance_exact_path - 1;
 
     std::cout << "# Summary #" << std::endl;
-    std::cout << "Dataset, datasize, epsilon, epsilon_SP, epsilon_SL: " << write_file_header << std::endl;
+    std::cout << "Dataset, datasize, epsilon, removing value: " << write_file_header << std::endl;
     std::cout << "Total log Steiner point building time: " << total_building_time << " milliseconds" << std::endl;
-    std::cout << "Total log Steiner point (with divide and conquer) query time: " << total_Steiner_point_query_time << " milliseconds" << std::endl;
+    std::cout << "Total rough log Steiner point (with divide and conquer) query time: " << total_Steiner_point_query_time << " milliseconds" << std::endl;
     std::cout << "Total effective weight snell law query time: " << total_snell_law_query_time << " milliseconds" << std::endl;
-    std::cout << "Total query time: " << total_Steiner_point_query_time + total_snell_law_query_time << " milliseconds" << std::endl;
-    std::cout << "Total log Steiner point (with divide and conquer) memory usage: " << total_Steiner_point_memory_size / 1e6 << " MB" << std::endl;
+    std::cout << "Total refined log Steiner point query time: " << Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total query time: " << total_Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << " milliseconds" << std::endl;
+    std::cout << "Total rough log Steiner point (with divide and conquer) memory usage: " << total_Steiner_point_memory_size / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search and effective weight snell law path memory usage: " << total_snell_law_memory_size / 1e6 << " MB" << std::endl;
-    std::cout << "Total memory usage: " << (total_Steiner_point_memory_size + total_snell_law_memory_size) / 1e6 << " MB" << std::endl;
+    std::cout << "Total refined log Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
+    std::cout << "Total memory usage: " << (total_Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search and effective weight snell law path count: " << total_binary_search_and_effective_weight_of_snell_law_path_count << std::endl;
     std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
     std::cout << "Total distance: " << total_distance_snell_law << std::endl;
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
     std::ofstream ofs("../output/output.txt", std::ios_base::app);
-    ofs << "== ProgLogSP-EffWeight ==\n";
+    if (pruned_Dijkstra)
+    {
+        ofs << "== Roug - Ref ==\n";
+    }
+    else
+    {
+        ofs << "== Roug - Ref (NoPrunDijk, ., ., .) ==\n";
+    }
     ofs << write_file_header << "\t"
         << total_building_time << "\t"
         << total_Steiner_point_query_time << "\t"
         << total_snell_law_query_time << "\t"
-        << total_Steiner_point_query_time + total_snell_law_query_time << "\t"
+        << Steiner_point_query_time_refined << "\t"
+        << total_Steiner_point_query_time + total_snell_law_query_time + Steiner_point_query_time_refined << "\t"
         << total_Steiner_point_memory_size / 1e6 << "\t"
         << total_snell_law_memory_size / 1e6 << "\t"
-        << (total_Steiner_point_memory_size + total_snell_law_memory_size) / 1e6 << "\t"
+        << Steiner_point_memory_size_refined / 1e6 << "\t"
+        << (total_Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << "\t"
         << total_binary_search_and_effective_weight_of_snell_law_path_count << "\t"
         << distance_error * 100 << "\t"
         << total_distance_snell_law << "\t"

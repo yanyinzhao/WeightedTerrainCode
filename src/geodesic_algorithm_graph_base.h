@@ -21,9 +21,14 @@ namespace geodesic
 		~GeodesicAlgorithmGraphBase(){};
 
 		void propagate(std::vector<SurfacePoint> &sources,
-					   double max_propagation_distance = GEODESIC_INF, // propagation algorithm stops after reaching the certain distance from the source
-					   std::vector<SurfacePoint> *stop_points = NULL,
-					   int k = 10000000); // or after ensuring that all the stop_points are covered
+					   double max_propagation_distance,		   // propagation algorithm stops after reaching the certain distance from the source
+					   std::vector<SurfacePoint> *stop_points, // or after ensuring that all the stop_points are covered
+					   std::unordered_map<int, double> input_dist,
+					   std::unordered_map<int, int> input_prev_node,
+					   std::unordered_map<int, int> input_src_index,
+					   std::unordered_map<int, double> &output_dist,
+					   std::unordered_map<int, int> &output_prev_node,
+					   std::unordered_map<int, int> &output_src_index);
 
 		void trace_back(SurfacePoint &destination, // trace back piecewise-linear path
 						std::vector<SurfacePoint> &path);
@@ -35,7 +40,7 @@ namespace geodesic
 		{
 			GeodesicAlgorithmBase::print_statistics();
 
-			double memory = m_nodes.size() * sizeof(Node);
+			double memory = m_nodes.size() * sizeof(Node) / (m_removing_value + 1);
 			std::cout << "uses about " << memory / 1e6 << "MB of memory" << std::endl;
 		}
 
@@ -456,6 +461,7 @@ namespace geodesic
 
 		std::vector<Node> m_nodes; // nodes of the graph
 		std::vector<Node> m_face;  // face of the graph
+		int m_removing_value;
 
 		typedef std::set<node_pointer, Node> queue_type;
 		queue_type m_queue;
@@ -463,10 +469,17 @@ namespace geodesic
 		std::vector<SurfacePoint> m_sources; // for simplicity, we keep sources as they are
 	};
 
+	// propagation algorithm stops after reaching the certain distance from the source or after ensuring that all the stop_points are covered
 	template <class Node>
 	void GeodesicAlgorithmGraphBase<Node>::propagate(std::vector<SurfacePoint> &sources,
-													 double max_propagation_distance,				// propagation algorithm stops after reaching the certain distance from the source
-													 std::vector<SurfacePoint> *stop_points, int k) // or after ensuring that all the stop_points are covered
+													 double max_propagation_distance,
+													 std::vector<SurfacePoint> *stop_points,
+													 std::unordered_map<int, double> input_dist,
+													 std::unordered_map<int, int> input_prev_node,
+													 std::unordered_map<int, int> input_src_index,
+													 std::unordered_map<int, double> &output_dist,
+													 std::unordered_map<int, int> &output_prev_node,
+													 std::unordered_map<int, int> &output_src_index)
 	{
 		set_stop_conditions(stop_points, max_propagation_distance);
 		set_sources(sources);
@@ -476,6 +489,28 @@ namespace geodesic
 		for (unsigned i = 0; i < m_nodes.size(); ++i)
 		{
 			m_nodes[i].clear();
+		}
+
+		for (unsigned i = 0; i < m_nodes.size(); ++i)
+		{
+			if (i != m_nodes[i].node_id())
+			{
+				std::cout << "i: " << i << ", node id: " << m_nodes[i].node_id() << std::endl;
+			}
+			assert(i == m_nodes[i].node_id());
+
+			if (input_dist.count(i) != 0)
+			{
+				m_nodes[i].distance_from_source() = input_dist[i];
+			}
+			if (input_prev_node.count(i) != 0)
+			{
+				m_nodes[i].previous() = &m_nodes[input_prev_node[i]];
+			}
+			if (input_src_index.count(i) != 0)
+			{
+				m_nodes[i].source_index() = input_src_index[i];
+			}
 		}
 
 		clock_t start = clock();
@@ -496,17 +531,10 @@ namespace geodesic
 					node->distance_from_source() = distance;
 					node->source_index() = i;
 					node->previous() = NULL;
+					m_queue.insert(node);
 				}
 			}
 			visible_nodes.clear();
-		}
-
-		for (unsigned i = 0; i < m_nodes.size(); ++i) // initialize the queue
-		{
-			if (m_nodes[i].distance_from_source() < GEODESIC_INF)
-			{
-				m_queue.insert(&m_nodes[i]);
-			}
 		}
 
 		unsigned counter = 0;
@@ -540,12 +568,6 @@ namespace geodesic
 				if (next_node->distance_from_source() > min_node->distance_from_source() +
 															distances_between_nodes[i])
 				{
-					if (next_node->distance_from_source() < GEODESIC_INF) // remove it from the queue
-					{
-						typename queue_type::iterator iter = m_queue.find(next_node);
-						assert(iter != m_queue.end());
-						m_queue.erase(iter);
-					}
 					next_node->distance_from_source() = min_node->distance_from_source() +
 														distances_between_nodes[i];
 					next_node->source_index() = min_node->source_index();
@@ -558,6 +580,16 @@ namespace geodesic
 		m_propagation_distance_stopped = m_queue.empty() ? GEODESIC_INF : (*m_queue.begin())->distance_from_source();
 		clock_t finish = clock();
 		m_time_consumed = (static_cast<double>(finish) - static_cast<double>(start)) / CLOCKS_PER_SEC;
+
+		for (unsigned i = 0; i < m_nodes.size(); ++i)
+		{
+			if (m_nodes[i].previous() != NULL)
+			{
+				output_dist[i] = m_nodes[i].distance_from_source();
+				output_prev_node[i] = m_nodes[i].previous()->node_id();
+				output_src_index[i] = m_nodes[i].source_index();
+			}
+		}
 	}
 
 	template <class Node>
@@ -620,7 +652,7 @@ namespace geodesic
 	template <class Node>
 	inline double GeodesicAlgorithmGraphBase<Node>::get_memory()
 	{
-		double memory_size = m_nodes.size() * sizeof(Node);
+		double memory_size = m_nodes.size() * sizeof(Node) / (m_removing_value + 1);
 		return memory_size;
 	}
 
