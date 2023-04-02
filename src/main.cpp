@@ -174,9 +174,8 @@ int main(int argc, char **argv)
 
 	std::string write_file_header = input_dataset + "\t" +
 									std::to_string(mesh.faces().size()) + "\t" +
-									std::to_string(std::max(Steiner_point_epsilon, snell_law_epsilon)) + "\t" +
 									std::to_string(Steiner_point_epsilon) + "\t" +
-									std::to_string(snell_law_epsilon);
+									std::to_string(removing_value);
 
 	std::ofstream ofs("../output/output.txt", std::ofstream::app);
 	ofs << "# dataset\tdatasize\tepsilon\tremoving_value\tbuilding_time\tquery_time_algo1\tquery_time_algo2_snell_law\tquery_time_algo2_refined\tquery_time_total\tmemory_usage_algo1\tmemory_usage_algo2_snell_law\tmemory_usage_algo2_refined\tmemory_usage_total\tsnell_law_iteration_count\tdistance_error\tdistance\tedge_sequence_size\n\n";

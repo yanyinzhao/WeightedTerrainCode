@@ -3307,7 +3307,7 @@ void fixed_Steiner_point_and_effective_weight_snell_law(
 
             auto start = std::chrono::high_resolution_clock::now();
 
-            effective_weight_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta, binary_search_and_effective_weight_of_snell_law_path_count, total_snell_law_memory_size, segment_path_list.size());
+            effective_weight_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta * 20, binary_search_and_effective_weight_of_snell_law_path_count, total_snell_law_memory_size, segment_path_list.size());
 
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
@@ -3733,7 +3733,7 @@ void fixed_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(
 
             auto start = std::chrono::high_resolution_clock::now();
 
-            effective_weight_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta, binary_search_and_effective_weight_of_snell_law_path_count, total_snell_law_memory_size, 1);
+            effective_weight_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta * 20, binary_search_and_effective_weight_of_snell_law_path_count, total_snell_law_memory_size, 1);
 
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
@@ -4147,7 +4147,7 @@ void log_Steiner_point_and_effective_weight_snell_law(
 
             auto start = std::chrono::high_resolution_clock::now();
 
-            effective_weight_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta, binary_search_and_effective_weight_of_snell_law_path_count, total_snell_law_memory_size, segment_path_list.size());
+            effective_weight_binary_search_multiple_times_of_each_edge(mesh, edge_sequence, face_sequence, segment_source_list[i], segment_destination_list[i], snell_law_path, snell_law_delta * 20, binary_search_and_effective_weight_of_snell_law_path_count, total_snell_law_memory_size, segment_path_list.size());
 
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
