@@ -1,8 +1,8 @@
-# Finding Shortest Path on 3D Weighted Terrain Surface
+# Efficiently Finding Shortest Path on 3D Weighted Terrain Surface
 
 ## Overview
 
-This project provides the implementation of the algorithm for finding the shortest path on 3D weighted terrain surface. We refer the readers to our paper for more details.
+This project provides the implementation of the algorithm for efficiently finding the shortest path on 3D weighted terrain surface. We refer the readers to our paper for more details.
 
 We compared 18 algorithms as follows:
 
