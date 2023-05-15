@@ -104,7 +104,7 @@ The meaning for each parameter is as follows:
 
 By default (even if you set both [calculate_exact_path] and [calculate_FixSP] to 0), the project will run algorithm including LogSP without calculating the error ratio compared with the exact path (thus, the distance error compared with the exact path and the calculated path will be infinity).
 
-When you set [calculate_exact_path] to 0 and [calculate_FixSP] to 1, the project will run all algorithms without calculating the error ratio compared with the exact path (thus, the distance error compared with the exact path and the calculated path will be infinity).
+When you set [calculate_exact_path] to 0 and [calculate_FixSP] to 1, the project will run all algorithms without calculating the error ratio compared with the exact path.
 
 When you set both [calculate_exact_path] and [calculate_FixSP] to 1, the project will run all algorithms and also calculate the error ratio compared with the exact path.
 
@@ -116,7 +116,7 @@ An example:
 ./main EP_small.off 1 2 0 1
 ```
 
-In this example, EP_small.off is the terrain data file, epsilon is 1, removing value is 2, exact path will not be calculated (and the distance error compared with the exact path and the calculated path will be infinity), and algorithm FixSP will be included (thus, it will run all 18 algorithms).
+In this example, EP_small.off is the terrain data file, epsilon is 1, removing value is 2, exact path will not be calculated, and algorithm FixSP will be included (thus, it will run all 18 algorithms).
 
 ## Output
 

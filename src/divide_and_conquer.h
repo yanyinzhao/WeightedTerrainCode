@@ -2876,7 +2876,8 @@ void fixed_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::Surface
                                          std::string write_file_header,
                                          double Steiner_point_epsilon, int estimate_path_length,
                                          double total_distance_exact_path,
-                                         std::vector<geodesic::SurfacePoint> &result_path)
+                                         std::vector<geodesic::SurfacePoint> &result_path,
+                                         int calculate_exact_path)
 {
     double building_time;
     double Steiner_point_query_time;
@@ -2913,7 +2914,10 @@ void fixed_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::Surface
     std::cout << "Fixed Steiner point building time: " << building_time << " milliseconds" << std::endl;
     std::cout << "Fixed Steiner point query time: " << Steiner_point_query_time << " milliseconds" << std::endl;
     std::cout << "Fixed Steiner point memory usage: " << Steiner_point_memory_size / 1e6 << " MB" << std::endl;
-    std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    if (calculate_exact_path == 1)
+    {
+        std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    }
     std::cout << "Total distance: " << total_distance_Steiner_point << std::endl;
 
     std::ofstream ofs("../output/output.txt", std::ios_base::app);
@@ -2943,7 +2947,8 @@ void log_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::SurfacePo
                                        std::string write_file_header,
                                        double Steiner_point_epsilon,
                                        double total_distance_exact_path,
-                                       std::vector<geodesic::SurfacePoint> &result_path)
+                                       std::vector<geodesic::SurfacePoint> &result_path,
+                                       int calculate_exact_path)
 {
     double building_time;
     double Steiner_point_query_time;
@@ -2980,7 +2985,10 @@ void log_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::SurfacePo
     std::cout << "Log Steiner point building time: " << building_time << " milliseconds" << std::endl;
     std::cout << "Log Steiner point query time: " << Steiner_point_query_time << " milliseconds" << std::endl;
     std::cout << "Log Steiner point memory usage: " << Steiner_point_memory_size / 1e6 << " MB" << std::endl;
-    std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    if (calculate_exact_path == 1)
+    {
+        std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    }
     std::cout << "Total distance: " << total_distance_Steiner_point << std::endl;
 
     std::ofstream ofs("../output/output.txt", std::ios_base::app);
@@ -3011,7 +3019,8 @@ void fixed_Steiner_point_and_binary_search_snell_law(
     double Steiner_point_epsilon, int removing_value, int estimate_path_length,
     double snell_law_epsilon, double total_distance_exact_path,
     std::vector<geodesic::SurfacePoint> &result_path,
-    bool pruned_Dijkstra)
+    bool pruned_Dijkstra,
+    int calculate_exact_path)
 {
     double building_time;
     double Steiner_point_query_time;
@@ -3178,7 +3187,10 @@ void fixed_Steiner_point_and_binary_search_snell_law(
     std::cout << "Total refined fixed Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
     std::cout << "Total memory usage: " << (Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search snell law path count: " << total_binary_search_of_snell_law_path_count << std::endl;
-    std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    if (calculate_exact_path == 1)
+    {
+        std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    }
     std::cout << "Total distance: " << total_distance_snell_law << std::endl;
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
@@ -3217,7 +3229,8 @@ void fixed_Steiner_point_and_effective_weight_snell_law(
     double Steiner_point_epsilon, int removing_value, int estimate_path_length,
     double snell_law_epsilon, double total_distance_exact_path,
     std::vector<geodesic::SurfacePoint> &result_path,
-    bool pruned_Dijkstra)
+    bool pruned_Dijkstra,
+    int calculate_exact_path)
 {
     double building_time;
     double Steiner_point_query_time;
@@ -3384,7 +3397,10 @@ void fixed_Steiner_point_and_effective_weight_snell_law(
     std::cout << "Total refined fixed Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
     std::cout << "Total memory usage: " << (Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search and effective weight snell law path count: " << total_binary_search_and_effective_weight_of_snell_law_path_count << std::endl;
-    std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    if (calculate_exact_path == 1)
+    {
+        std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    }
     std::cout << "Total distance: " << total_distance_snell_law << std::endl;
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
@@ -3427,7 +3443,8 @@ void fixed_Steiner_point_divide_and_conquer_and_binary_search_snell_law(
     int max_loop_num_for_single_endpoint,
     double total_distance_exact_path,
     std::vector<geodesic::SurfacePoint> &result_path,
-    bool pruned_Dijkstra)
+    bool pruned_Dijkstra,
+    int calculate_exact_path)
 {
     double total_building_time = 0;
     double total_Steiner_point_time;
@@ -3597,7 +3614,10 @@ void fixed_Steiner_point_divide_and_conquer_and_binary_search_snell_law(
     std::cout << "Total refined fixed Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
     std::cout << "Total memory usage: " << (total_Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search snell law path count: " << total_binary_search_of_snell_law_path_count << std::endl;
-    std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    if (calculate_exact_path == 1)
+    {
+        std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    }
     std::cout << "Total distance: " << total_distance_snell_law << std::endl;
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
@@ -3640,7 +3660,8 @@ void fixed_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(
     int max_loop_num_for_single_endpoint,
     double total_distance_exact_path,
     std::vector<geodesic::SurfacePoint> &result_path,
-    bool pruned_Dijkstra)
+    bool pruned_Dijkstra,
+    int calculate_exact_path)
 {
     double total_building_time = 0;
     double total_Steiner_point_time;
@@ -3810,7 +3831,10 @@ void fixed_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(
     std::cout << "Total refined fixed Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
     std::cout << "Total memory usage: " << (total_Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search and effective weight snell law path count: " << total_binary_search_and_effective_weight_of_snell_law_path_count << std::endl;
-    std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    if (calculate_exact_path == 1)
+    {
+        std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    }
     std::cout << "Total distance: " << total_distance_snell_law << std::endl;
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
@@ -3849,7 +3873,8 @@ void log_Steiner_point_and_binary_search_snell_law(
     double Steiner_point_epsilon, int removing_value,
     double snell_law_epsilon, double total_distance_exact_path,
     std::vector<geodesic::SurfacePoint> &result_path,
-    bool pruned_Dijkstra)
+    bool pruned_Dijkstra,
+    int calculate_exact_path)
 {
     double building_time;
     double Steiner_point_query_time;
@@ -4018,7 +4043,10 @@ void log_Steiner_point_and_binary_search_snell_law(
     std::cout << "Total refined log Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
     std::cout << "Total memory usage: " << (Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search and binary search snell law path count: " << total_binary_search_of_snell_law_path_count << std::endl;
-    std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    if (calculate_exact_path == 1)
+    {
+        std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    }
     std::cout << "Total distance: " << total_distance_snell_law << std::endl;
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
@@ -4057,7 +4085,8 @@ void log_Steiner_point_and_effective_weight_snell_law(
     double Steiner_point_epsilon, int removing_value,
     double snell_law_epsilon, double total_distance_exact_path,
     std::vector<geodesic::SurfacePoint> &result_path,
-    bool pruned_Dijkstra)
+    bool pruned_Dijkstra,
+    int calculate_exact_path)
 {
     double building_time;
     double Steiner_point_query_time;
@@ -4224,7 +4253,10 @@ void log_Steiner_point_and_effective_weight_snell_law(
     std::cout << "Total refined log Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
     std::cout << "Total memory usage: " << (Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search and effective weight snell law path count: " << total_binary_search_and_effective_weight_of_snell_law_path_count << std::endl;
-    std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    if (calculate_exact_path == 1)
+    {
+        std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    }
     std::cout << "Total distance: " << total_distance_snell_law << std::endl;
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
@@ -4266,7 +4298,8 @@ void log_Steiner_point_divide_and_conquer_and_binary_search_snell_law(
     int max_loop_num_for_single_endpoint,
     double total_distance_exact_path,
     std::vector<geodesic::SurfacePoint> &result_path,
-    bool pruned_Dijkstra)
+    bool pruned_Dijkstra,
+    int calculate_exact_path)
 {
     double total_building_time = 0;
     double total_Steiner_point_time;
@@ -4436,7 +4469,10 @@ void log_Steiner_point_divide_and_conquer_and_binary_search_snell_law(
     std::cout << "Total refined log Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
     std::cout << "Total memory usage: " << (total_Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search snell law path count: " << total_binary_search_of_snell_law_path_count << std::endl;
-    std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    if (calculate_exact_path == 1)
+    {
+        std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    }
     std::cout << "Total distance: " << total_distance_snell_law << std::endl;
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
@@ -4478,7 +4514,8 @@ void log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(
     int max_loop_num_for_single_endpoint,
     double total_distance_exact_path,
     std::vector<geodesic::SurfacePoint> &result_path,
-    bool pruned_Dijkstra)
+    bool pruned_Dijkstra,
+    int calculate_exact_path)
 {
     double total_building_time = 0;
     double total_Steiner_point_time;
@@ -4648,7 +4685,10 @@ void log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(
     std::cout << "Total refined log Steiner point memory usage: " << Steiner_point_memory_size_refined / 1e6 << " MB" << std::endl;
     std::cout << "Total memory usage: " << (total_Steiner_point_memory_size + total_snell_law_memory_size + Steiner_point_memory_size_refined) / 1e6 << " MB" << std::endl;
     std::cout << "Total binary search and effective weight snell law path count: " << total_binary_search_and_effective_weight_of_snell_law_path_count << std::endl;
-    std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    if (calculate_exact_path == 1)
+    {
+        std::cout << "Distance error: " << distance_error * 100 << "%" << std::endl;
+    }
     std::cout << "Total distance: " << total_distance_snell_law << std::endl;
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
