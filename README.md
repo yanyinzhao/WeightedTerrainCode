@@ -113,10 +113,10 @@ We use Roug-Ref(NoPrunDijk, FixSP, NoEdgSeqConv, NoEffWeig) and set epsilon = 0.
 An example:
 
 ```
-./main EP_small.off 0.25 2 0 0
+./main EP_small.off 1 2 0 1
 ```
 
-In this example, EP_small.off is the terrain data file, epsilon is 0.25, removing value is 2, exact path will not be calculated (and the distance error compared with the exact path and the calculated path will be infinity), and algorithm FixSP will not be included (thus, it will run all 9 algorithms).
+In this example, EP_small.off is the terrain data file, epsilon is 1, removing value is 2, exact path will not be calculated (and the distance error compared with the exact path and the calculated path will be infinity), and algorithm FixSP will be included (thus, it will run all 18 algorithms).
 
 ## Output
 
