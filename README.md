@@ -1,4 +1,4 @@
-# Efficiently Finding Shortest Path on 3D Weighted Terrain Surface
+# Efficiently Finding Shortest Path on 3D Weighted Terrain Surfaces
 
 ## Overview
 
