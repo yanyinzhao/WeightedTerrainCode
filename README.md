@@ -4,8 +4,9 @@
 
 This project provides the implementation of the algorithm for efficiently finding the shortest path on 3D weighted terrain surface. We refer the readers to our paper for more details.
 
-We compared 18 algorithms as follows:
+We compared 19 algorithms as follows:
 
+- algorithm EdgSeq (baseline)
 - algorithm FixSP (baseline)
 - algorithm LogSP (baseline)
 - algorithm Roug-Ref(NoPrunDijk, FixSP, NoEdgSeqConv, NoEffWeig) (baseline)
@@ -108,7 +109,7 @@ When you set [calculate_exact_path] to 0 and [calculate_FixSP] to 1, the project
 
 When you set both [calculate_exact_path] and [calculate_FixSP] to 1, the project will run all algorithms and also calculate the error ratio compared with the exact path.
 
-We use Roug-Ref(NoPrunDijk, FixSP, NoEdgSeqConv, NoEffWeig) and set epsilon = 0.05 and the removing value to be 2 to simulate the exact path. So when you run the terrain data with dataset size more than 2000, we strongly encourage you to set [calculate_exact_path] to 0. Otherwise, it will take a very long time to simulate the exact path (which is not the main purpose of this project). You should simulate the exact path ONLY when you need to calculate the error ratio of the calculated path compared with the exact path in the experiment. In addition, when you run the terrain data with dataset size more than 20000, we strongly encourage you to set [calculate_FixSP] to 0. Otherwise, it will take a very long time to run algorithm FixSP (because algorithm FixSP performs very bad when terrain data is large).
+We use algorithm EdgSeq (which involves FisSP) and set epsilon = 0.05 to simulate the exact path. So when you run the terrain data with dataset size more than 2000, we strongly encourage you to set [calculate_exact_path] to 0. Otherwise, it will take a very long time to simulate the exact path (which is not the main purpose of this project). You should simulate the exact path ONLY when you need to calculate the error ratio of the calculated path compared with the exact path in the experiment. In addition, when you run the terrain data with dataset size more than 20000, we strongly encourage you to set [calculate_FixSP] to 0. Otherwise, it will take a very long time to run algorithm EdgSeq and FixSP (because they perform very bad when terrain data is large).
 
 An example:
 
@@ -116,7 +117,7 @@ An example:
 ./main EP_small.off 1 2 0 1
 ```
 
-In this example, EP_small.off is the terrain data file, epsilon is 1, removing value is 2, exact path will not be calculated, and algorithm FixSP will be included (thus, it will run all 18 algorithms).
+In this example, EP_small.off is the terrain data file, epsilon is 1, removing value is 2, exact path will not be calculated, and algorithm FixSP will be included (thus, it will run all 19 algorithms).
 
 ## Output
 

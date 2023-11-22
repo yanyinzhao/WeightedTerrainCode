@@ -208,7 +208,7 @@ int main(int argc, char **argv)
 	if (calculate_exact_path == 1)
 	{
 		std::cout << "\n== Start simulating the exact path ==" << std::endl;
-		simulate_exact_path(&mesh, source, destination, path, 0.05, 0, estimate_path_length, 0.05, exact_result_path, exact_result_path_distance);
+		simulate_exact_path(&mesh, source, destination, path, 0.05, estimate_path_length, 0.05, exact_result_path, exact_result_path_distance);
 		std::cout << "exact_result_path_distance:" << exact_result_path_distance << std::endl;
 		std::cout << "== Finished simulating the exact path ==\n"
 				  << std::endl;
@@ -216,6 +216,11 @@ int main(int argc, char **argv)
 
 	if (calculate_FixSP == 1)
 	{
+		std::cout << "== EdgSeq ==" << std::endl;
+		fixed_Steiner_point_and_binary_search_snell_law_no_roug_ref(
+			&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, estimate_path_length,
+			snell_law_epsilon, exact_result_path_distance, fixed_Steiner_point_and_binary_search_snell_law_result_path, calculate_exact_path);
+		std::cout << std::endl;
 
 		std::cout << "== FixSP ==" << std::endl;
 		fixed_Steiner_point_with_exp_output(&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, estimate_path_length, exact_result_path_distance, fixed_Steiner_point_result_path, calculate_exact_path);
