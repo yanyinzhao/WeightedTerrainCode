@@ -2992,7 +2992,7 @@ void log_Steiner_point_with_exp_output(geodesic::Mesh *mesh, geodesic::SurfacePo
     std::cout << "Total distance: " << total_distance_Steiner_point << std::endl;
 
     std::ofstream ofs("../output/output.txt", std::ios_base::app);
-    ofs << "== LogSP ==\n";
+    ofs << "== LogSP-Adapt ==\n";
     ofs << write_file_header << "\t"
         << building_time << "\t"
         << Steiner_point_query_time << "\t"

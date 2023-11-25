@@ -8,7 +8,7 @@ We compared 19 algorithms as follows:
 
 - algorithm EdgSeq (baseline)
 - algorithm FixSP (baseline)
-- algorithm LogSP (baseline)
+- algorithm LogSP-Adapt (baseline)
 - algorithm Roug-Ref(NoPrunDijk, FixSP, NoEdgSeqConv, NoEffWeig) (baseline)
 - algorithm Roug-Ref(NoPrunDijk, FixSP, NoEdgSeqConv, .) (baseline)
 - algorithm Roug-Ref(NoPrunDijk, FixSP, ., NoEffWeig) (baseline)
@@ -103,7 +103,7 @@ The meaning for each parameter is as follows:
 - [calculate_exact_path]: whether to calculate exact path, 1 for calculate exact path, 0 for not calculate exact path
 - [calculate_FixSP]: whether to calculate FixSP, 1 for calculate FixSP, 0 for not calculate FixSP
 
-By default (even if you set both [calculate_exact_path] and [calculate_FixSP] to 0), the project will run algorithm including LogSP without calculating the error ratio compared with the exact path (thus, the distance error compared with the exact path and the calculated path will be infinity).
+By default (even if you set both [calculate_exact_path] and [calculate_FixSP] to 0), the project will run algorithm including LogSP-Adapt without calculating the error ratio compared with the exact path (thus, the distance error compared with the exact path and the calculated path will be infinity).
 
 When you set [calculate_exact_path] to 0 and [calculate_FixSP] to 1, the project will run all algorithms without calculating the error ratio compared with the exact path.
 

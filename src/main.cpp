@@ -279,7 +279,7 @@ int main(int argc, char **argv)
 		std::cout << std::endl;
 	}
 
-	std::cout << "== LogSP ==" << std::endl;
+	std::cout << "== LogSP-Adapt ==" << std::endl;
 	log_Steiner_point_with_exp_output(&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, exact_result_path_distance, log_Steiner_point_result_path, calculate_exact_path);
 	std::cout << std::endl;
 
