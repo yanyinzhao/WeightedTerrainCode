@@ -4,26 +4,16 @@
 
 This project provides the implementation of the algorithm for efficiently finding the shortest path on 3D weighted terrain surface. We refer the readers to our paper for more details.
 
-We compared 19 algorithms as follows:
+We compared 9 algorithms as follows:
 
 - algorithm EdgSeq (baseline)
 - algorithm FixSP (baseline)
 - algorithm LogSP-Adapt (baseline)
-- algorithm Roug-Ref(NoPrunDijk, FixSP, NoEdgSeqConv, NoEffWeig) (baseline)
-- algorithm Roug-Ref(NoPrunDijk, FixSP, NoEdgSeqConv, .) (baseline)
-- algorithm Roug-Ref(NoPrunDijk, FixSP, ., NoEffWeig) (baseline)
-- algorithm Roug-Ref(NoPrunDijk, FixSP, ., .) (baseline)
-- algorithm Roug-Ref(NoPrunDijk, ., NoEdgSeqConv, NoEffWeig) (baseline)
-- algorithm Roug-Ref(NoPrunDijk, ., NoEdgSeqConv, .) (baseline)
-- algorithm Roug-Ref(NoPrunDijk, ., ., NoEffWeig) (baseline)
-- algorithm Roug-Ref(NoPrunDijk, ., ., .) (baseline)
-- algorithm Roug-Ref(., FixSP, NoEdgSeqConv, NoEffWeig) (baseline)
-- algorithm Roug-Ref(., FixSP, NoEdgSeqConv, .) (baseline)
-- algorithm Roug-Ref(., FixSP, ., NoEffWeig) (baseline)
-- algorithm Roug-Ref(., FixSP, ., .) (baseline)
-- algorithm Roug-Ref(., ., NoEdgSeqConv, NoEffWeig) (baseline)
-- algorithm Roug-Ref(., ., NoEdgSeqConv, .) (baseline)
-- algorithm Roug-Ref(., ., ., NoEffWeig) (baseline)
+- algorithm Roug-Ref-AllNaive (baseline)
+- algorithm Roug-Ref-NoEffSP (baseline)
+- algorithm Roug-Ref-NoEdgSeqConv (baseline)
+- algorithm Roug-Ref-NoEffWeig (baseline)
+- algorithm Roug-Ref-NoPrunDijk (baseline)
 - algorithm Roug-Ref (our algorithm)
 
 Make sure there is a folder called "input/" and a folder called "output/" under the working directory. They will be used for storing the input/output files.
@@ -109,7 +99,7 @@ When you set [calculate_exact_path] to 0 and [calculate_FixSP] to 1, the project
 
 When you set both [calculate_exact_path] and [calculate_FixSP] to 1, the project will run all algorithms and also calculate the error ratio compared with the exact path.
 
-We use algorithm EdgSeq (which involves FisSP) and set epsilon = 0.05 to simulate the exact path. So when you run the terrain data with dataset size more than 2000, we strongly encourage you to set [calculate_exact_path] to 0. Otherwise, it will take a very long time to simulate the exact path (which is not the main purpose of this project). You should simulate the exact path ONLY when you need to calculate the error ratio of the calculated path compared with the exact path in the experiment. In addition, when you run the terrain data with dataset size more than 20000, we strongly encourage you to set [calculate_FixSP] to 0. Otherwise, it will take a very long time to run algorithm EdgSeq and FixSP (because they perform very bad when terrain data is large).
+We use algorithm EdgSeq (which involves FixSP) and set epsilon = 0.05 to simulate the exact path. So when you run the terrain data with dataset size more than 2000, we strongly encourage you to set [calculate_exact_path] to 0. Otherwise, it will take a very long time to simulate the exact path (which is not the main purpose of this project). You should simulate the exact path ONLY when you need to calculate the error ratio of the calculated path compared with the exact path in the experiment. In addition, when you run the terrain data with dataset size more than 20000, we strongly encourage you to set [calculate_FixSP] to 0. Otherwise, it will take a very long time to run algorithm EdgSeq and FixSP (because they perform very bad when terrain data is large).
 
 An example:
 
@@ -117,14 +107,14 @@ An example:
 ./main EP_small.off 1 2 0 1
 ```
 
-In this example, EP_small.off is the terrain data file, epsilon is 1, removing value is 2, exact path will not be calculated, and algorithm FixSP will be included (thus, it will run all 19 algorithms).
+In this example, EP_small.off is the terrain data file, epsilon is 1, removing value is 2, exact path will not be calculated, and algorithm EdgSeq, FixSP, Roug-Ref-AllNaive and Roug-Ref-NoEffSP will be included (thus, it will run all 9 algorithms).
 
 ## Output
 
 The output will be stored in "output/output.txt" file. The format will be as follows:
 
 ```
-[dataset] [datasize] [epsilon] [removing_value] [building_time (ms)] [query_time_algo1 (ms)] [query_time_algo2_snell_law (ms)] [query_time_algo2_refined (ms)] [query_time_total (ms)] [memory_usage_algo1 (MB)] [memory_usage_algo2_snell_law (MB)] [memory_usage_algo2_refined (MB)] [memory_usage_total (MB)] [snell_law_iteration_count] [distance_error] [distance] [edge_sequence_size]
+[dataset] [datasize] [epsilon] [removing_value] [building_time (ms)] [query_time_algo1 (ms)] [query_time_algo2_snell_law (ms)] [query_time_algo2_refined (ms)] [query_time_total (ms)] [memory_usage_algo1 (MB)] [memory_usage_algo2_snell_law (MB)] [memory_usage_algo2_refined (MB)] [memory_usage_total (MB)] [chances_of_using_error_guaranteed_path_refinement_step] [average_number_of_Steiner_points_per_edge_algo1] [average_number_of_Steiner_points_per_edge_algo2] [total_average_number_of_Steiner_points_per_edge] [snell_law_iteration_count] [distance_error] [distance] [edge_sequence_size]
 ```
 
 These information will also be shown in the terminal. 

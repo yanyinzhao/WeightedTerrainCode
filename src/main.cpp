@@ -139,28 +139,11 @@ int main(int argc, char **argv)
 
 	std::vector<geodesic::SurfacePoint> fixed_Steiner_point_result_path;
 	std::vector<geodesic::SurfacePoint> log_Steiner_point_result_path;
-
+	std::vector<geodesic::SurfacePoint> fixed_Steiner_point_and_binary_search_snell_law_no_roug_ref_result_path;
 	std::vector<geodesic::SurfacePoint> fixed_Steiner_point_and_binary_search_snell_law_result_path;
-	std::vector<geodesic::SurfacePoint> fixed_Steiner_point_and_effective_weight_snell_law_result_path;
-
-	std::vector<geodesic::SurfacePoint> fixed_Steiner_point_divide_and_conquer_and_binary_search_snell_law_result_path;
-	std::vector<geodesic::SurfacePoint> fixed_Steiner_point_divide_and_conquer_and_effective_weight_snell_law_result_path;
-
-	std::vector<geodesic::SurfacePoint> log_Steiner_point_and_binary_search_snell_law_result_path;
-	std::vector<geodesic::SurfacePoint> log_Steiner_point_and_effective_weight_snell_law_result_path;
-
-	std::vector<geodesic::SurfacePoint> log_Steiner_point_divide_and_conquer_and_binary_search_snell_law_result_path;
 	std::vector<geodesic::SurfacePoint> log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law_result_path;
-
-	std::vector<geodesic::SurfacePoint> fixed_Steiner_point_and_binary_search_snell_law_with_pruned_Dijkstra_result_path;
-	std::vector<geodesic::SurfacePoint> fixed_Steiner_point_and_effective_weight_snell_law_with_pruned_Dijkstra_result_path;
-
-	std::vector<geodesic::SurfacePoint> fixed_Steiner_point_divide_and_conquer_and_binary_search_snell_law_with_pruned_Dijkstra_result_path;
 	std::vector<geodesic::SurfacePoint> fixed_Steiner_point_divide_and_conquer_and_effective_weight_snell_law_with_pruned_Dijkstra_result_path;
-
-	std::vector<geodesic::SurfacePoint> log_Steiner_point_and_binary_search_snell_law_with_pruned_Dijkstra_result_path;
 	std::vector<geodesic::SurfacePoint> log_Steiner_point_and_effective_weight_snell_law_with_pruned_Dijkstra_result_path;
-
 	std::vector<geodesic::SurfacePoint> log_Steiner_point_divide_and_conquer_and_binary_search_snell_law_with_pruned_Dijkstra_result_path;
 	std::vector<geodesic::SurfacePoint> log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law_with_pruned_Dijkstra_result_path;
 
@@ -178,7 +161,7 @@ int main(int argc, char **argv)
 									std::to_string(removing_value);
 
 	std::ofstream ofs("../output/output.txt", std::ofstream::app);
-	ofs << "# dataset\tdatasize\tepsilon\tremoving_value\tbuilding_time\tquery_time_algo1\tquery_time_algo2_snell_law\tquery_time_algo2_refined\tquery_time_total\tmemory_usage_algo1\tmemory_usage_algo2_snell_law\tmemory_usage_algo2_refined\tmemory_usage_total\tsnell_law_iteration_count\tdistance_error\tdistance\tedge_sequence_size\n\n";
+	ofs << "# dataset\tdatasize\tepsilon\tremoving_value\tbuilding_time\tquery_time_algo1\tquery_time_algo2_snell_law\tquery_time_algo2_refined\tquery_time_total\tmemory_usage_algo1\tmemory_usage_algo2_snell_law\tmemory_usage_algo2_refined\tmemory_usage_total\tchances_of_using_error_guaranteed_path_refinement_step\taverage_number_of_Steiner_points_per_edge_algo1\taverage_number_of_Steiner_points_per_edge_algo2\ttotal_average_number_of_Steiner_points_per_edge\tsnell_law_iteration_count\tdistance_error\tdistance\tedge_sequence_size\n\n";
 	ofs.close();
 
 	// simulating the path length
@@ -219,59 +202,20 @@ int main(int argc, char **argv)
 		std::cout << "== EdgSeq ==" << std::endl;
 		fixed_Steiner_point_and_binary_search_snell_law_no_roug_ref(
 			&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, estimate_path_length,
-			snell_law_epsilon, exact_result_path_distance, fixed_Steiner_point_and_binary_search_snell_law_result_path, calculate_exact_path);
+			snell_law_epsilon, exact_result_path_distance, fixed_Steiner_point_and_binary_search_snell_law_no_roug_ref_result_path, calculate_exact_path);
 		std::cout << std::endl;
 
 		std::cout << "== FixSP ==" << std::endl;
 		fixed_Steiner_point_with_exp_output(&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, estimate_path_length, exact_result_path_distance, fixed_Steiner_point_result_path, calculate_exact_path);
 		std::cout << std::endl;
 
-		std::cout << "== Roug - Ref (NoPrunDijk, FixSP, NoEdgSeqConv, NoEffWeig) ==" << std::endl;
+		std::cout << "== Roug - Ref - AllNaive ==" << std::endl;
 		fixed_Steiner_point_and_binary_search_snell_law(
 			&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, estimate_path_length,
 			snell_law_epsilon, exact_result_path_distance, fixed_Steiner_point_and_binary_search_snell_law_result_path, false, calculate_exact_path);
 		std::cout << std::endl;
 
-		std::cout << "== Roug - Ref (NoPrunDijk, FixSP, NoEdgSeqConv, .) ==" << std::endl;
-		fixed_Steiner_point_and_effective_weight_snell_law(
-			&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, estimate_path_length,
-			snell_law_epsilon, exact_result_path_distance, fixed_Steiner_point_and_effective_weight_snell_law_result_path, false, calculate_exact_path);
-		std::cout << std::endl;
-
-		std::cout << "== Roug - Ref (NoPrunDijk, FixSP, ., NoEffWeig) ==" << std::endl;
-		fixed_Steiner_point_divide_and_conquer_and_binary_search_snell_law(
-			&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, estimate_path_length,
-			snell_law_epsilon, max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint,
-			exact_result_path_distance, fixed_Steiner_point_divide_and_conquer_and_binary_search_snell_law_result_path, false, calculate_exact_path);
-		std::cout << std::endl;
-
-		std::cout << "== Roug - Ref (NoPrunDijk, FixSP, ., .) ==" << std::endl;
-		fixed_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(
-			&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, estimate_path_length,
-			snell_law_epsilon, max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint,
-			exact_result_path_distance, fixed_Steiner_point_divide_and_conquer_and_effective_weight_snell_law_result_path, false, calculate_exact_path);
-		std::cout << std::endl;
-
-		std::cout << "== Roug - Ref (., FixSP, NoEdgSeqConv, NoEffWeig) ==" << std::endl;
-		fixed_Steiner_point_and_binary_search_snell_law(
-			&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, estimate_path_length,
-			snell_law_epsilon, exact_result_path_distance, fixed_Steiner_point_and_binary_search_snell_law_with_pruned_Dijkstra_result_path, true, calculate_exact_path);
-		std::cout << std::endl;
-
-		std::cout << "== Roug - Ref (., FixSP, NoEdgSeqConv, .) ==" << std::endl;
-		fixed_Steiner_point_and_effective_weight_snell_law(
-			&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, estimate_path_length,
-			snell_law_epsilon, exact_result_path_distance, fixed_Steiner_point_and_effective_weight_snell_law_with_pruned_Dijkstra_result_path, true, calculate_exact_path);
-		std::cout << std::endl;
-
-		std::cout << "== Roug - Ref (., FixSP, ., NoEffWeig) ==" << std::endl;
-		fixed_Steiner_point_divide_and_conquer_and_binary_search_snell_law(
-			&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, estimate_path_length,
-			snell_law_epsilon, max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint,
-			exact_result_path_distance, fixed_Steiner_point_divide_and_conquer_and_binary_search_snell_law_with_pruned_Dijkstra_result_path, true, calculate_exact_path);
-		std::cout << std::endl;
-
-		std::cout << "== Roug - Ref (., FixSP, ., .) ==" << std::endl;
+		std::cout << "== Roug - Ref - NoEffSP ==" << std::endl;
 		fixed_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(
 			&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, estimate_path_length,
 			snell_law_epsilon, max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint,
@@ -283,49 +227,24 @@ int main(int argc, char **argv)
 	log_Steiner_point_with_exp_output(&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, exact_result_path_distance, log_Steiner_point_result_path, calculate_exact_path);
 	std::cout << std::endl;
 
-	std::cout << "== Roug - Ref (NoPrunDijk, ., NoEdgSeqConv, NoEffWeig) ==" << std::endl;
-	log_Steiner_point_and_binary_search_snell_law(
-		&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, snell_law_epsilon,
-		exact_result_path_distance, log_Steiner_point_and_binary_search_snell_law_result_path, false, calculate_exact_path);
-	std::cout << std::endl;
-
-	std::cout << "== Roug - Ref (NoPrunDijk, ., NoEdgSeqConv, .) ==" << std::endl;
-	log_Steiner_point_and_effective_weight_snell_law(
-		&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, snell_law_epsilon,
-		exact_result_path_distance, log_Steiner_point_and_effective_weight_snell_law_result_path, false, calculate_exact_path);
-	std::cout << std::endl;
-
-	std::cout << "== Roug - Ref (NoPrunDijk, ., ., NoEffWeig) ==" << std::endl;
-	log_Steiner_point_divide_and_conquer_and_binary_search_snell_law(
-		&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, snell_law_epsilon,
-		max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint, exact_result_path_distance,
-		log_Steiner_point_divide_and_conquer_and_binary_search_snell_law_result_path, false, calculate_exact_path);
-	std::cout << std::endl;
-
-	std::cout << "== Roug - Ref (NoPrunDijk, ., ., .) ==" << std::endl;
-	log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(
-		&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, snell_law_epsilon,
-		max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint, exact_result_path_distance,
-		log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law_result_path, false, calculate_exact_path);
-	std::cout << std::endl;
-
-	std::cout << "== Roug - Ref (., ., NoEdgSeqConv, NoEffWeig) ==" << std::endl;
-	log_Steiner_point_and_binary_search_snell_law(
-		&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, snell_law_epsilon,
-		exact_result_path_distance, log_Steiner_point_and_binary_search_snell_law_with_pruned_Dijkstra_result_path, true, calculate_exact_path);
-	std::cout << std::endl;
-
-	std::cout << "== Roug - Ref (., ., NoEdgSeqConv, .) ==" << std::endl;
+	std::cout << "== Roug - Ref - NoEdgSeqConv ==" << std::endl;
 	log_Steiner_point_and_effective_weight_snell_law(
 		&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, snell_law_epsilon,
 		exact_result_path_distance, log_Steiner_point_and_effective_weight_snell_law_with_pruned_Dijkstra_result_path, true, calculate_exact_path);
 	std::cout << std::endl;
 
-	std::cout << "== Roug - Ref (., ., ., NoEffWeig) ==" << std::endl;
+	std::cout << "== Roug - Ref - NoEffWeig ==" << std::endl;
 	log_Steiner_point_divide_and_conquer_and_binary_search_snell_law(
 		&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, snell_law_epsilon,
 		max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint, exact_result_path_distance,
 		log_Steiner_point_divide_and_conquer_and_binary_search_snell_law_with_pruned_Dijkstra_result_path, true, calculate_exact_path);
+	std::cout << std::endl;
+
+	std::cout << "== Roug - Ref - NoPrunDijk ==" << std::endl;
+	log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law(
+		&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, snell_law_epsilon,
+		max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint, exact_result_path_distance,
+		log_Steiner_point_divide_and_conquer_and_effective_weight_snell_law_result_path, false, calculate_exact_path);
 	std::cout << std::endl;
 
 	std::cout << "== Roug - Ref ==" << std::endl;
