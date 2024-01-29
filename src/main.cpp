@@ -251,10 +251,10 @@ int main(int argc, char **argv)
 
 	if (calculate_FixSP_comp_and_LogSP_and_Roug == 1)
 	{
-		std::cout << "== EdgSeq ==" << std::endl;
+		std::cout << "== EdgSeq-Adp ==" << std::endl;
 		fixed_Steiner_point_and_binary_search_snell_law_no_roug_ref(
 			&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, estimate_path_length,
-			snell_law_epsilon, exact_result_path_distance, fixed_Steiner_point_and_binary_search_snell_law_no_roug_ref_result_path, calculate_exact_path);
+			snell_law_epsilon, exact_result_path_distance, fixed_Steiner_point_and_binary_search_snell_law_no_roug_ref_result_path, calculate_exact_path, 2);
 		std::cout << std::endl;
 
 		std::cout << "== FixSP and FixSP-NoWei-Adp ==" << std::endl;
@@ -272,6 +272,12 @@ int main(int argc, char **argv)
 			&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, removing_value, estimate_path_length,
 			snell_law_epsilon, max_loop_num_for_divide_and_conquer, max_loop_num_for_single_endpoint,
 			exact_result_path_distance, fixed_Steiner_point_divide_and_conquer_and_effective_weight_snell_law_with_pruned_Dijkstra_result_path, true, calculate_exact_path);
+		std::cout << std::endl;
+
+		std::cout << "== EdgSeq ==" << std::endl;
+		fixed_Steiner_point_and_binary_search_snell_law_no_roug_ref(
+			&mesh, source, destination, path, write_file_header, Steiner_point_epsilon, estimate_path_length,
+			snell_law_epsilon, exact_result_path_distance, fixed_Steiner_point_and_binary_search_snell_law_no_roug_ref_result_path, calculate_exact_path, 1);
 		std::cout << std::endl;
 
 		std::cout << "== LogSP (with same calculated distance of Roug-Ref) ==" << std::endl;

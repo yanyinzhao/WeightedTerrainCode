@@ -4,9 +4,10 @@
 
 This project provides the implementation of the algorithm for efficiently finding the shortest path on 3D weighted terrain surface for moving objects. We refer the readers to our paper for more details.
 
-We compared 13 algorithms as follows:
+We compared 14 algorithms as follows:
 
 - algorithm EdgSeq (baseline)
+- algorithm EdgSeq-Adp (baseline)
 - algorithm FixSP (baseline)
 - algorithm FixSP-NoWei-Adp (baseline)
 - algorithm LogSP-Adp (baseline)
@@ -20,7 +21,7 @@ We compared 13 algorithms as follows:
 - algorithm Roug (baseline)
 - algorithm Roug-Ref (our algorithm)
 
-For algorithm LogSP and Roug, they have distance errors larger than (1+epsilon). In order to compare them with algorithm Roug-Ref, given epsilon, we first calculate a path with distance d. Then, for algorithm LogSP and Roug, we finetune their input error to make their calculated path also with distance d, and measure their performance. 
+For algorithm EdgSeq, it does not have error bound. For algorithm LogSP and Roug, they have distance errors larger than (1+epsilon). In order to compare them with algorithm Roug-Ref, given epsilon, we first calculate a path with distance d. Then, for algorithm EdgSeq, LogSP and Roug, we finetune their input to make their calculated path also with distance d, and measure their performance. 
 
 Make sure there is a folder called "input/" and a folder called "output/" under the working directory. They will be used for storing the input/output files.
 
@@ -109,7 +110,7 @@ The meaning for each parameter is as follows:
 - [calculate_exact_path]: whether to calculate exact path, 1 for calculate exact path, 0 for not calculate exact path (in this case, the distance error compared with the exact path and the calculated path will be infinity)
 - [calculate_FixSP_comp_and_LogSP_and_Roug]: whether to calculate algorithms involves FixSP and algorithm LogSP (with same calculated distance of Roug-Ref) and algorithm Roug (with same calculated distance of Roug-Ref), 1 for calculate, 0 for not calculate
 
-We use algorithm EdgSeq (which involves FixSP) and set epsilon = 0.05 to simulate the exact path. So when you run the terrain data with dataset size more than 2000, we strongly encourage you to set [calculate_exact_path] to 0. Otherwise, it will take a very long time to simulate the exact path (which is not the main purpose of this project). You should simulate the exact path ONLY when you need to calculate the error ratio of the calculated path compared with the exact path in the experiment. In addition, when you run the terrain data with dataset size more than 20000, we strongly encourage you to set [calculate_FixSP_comp_and_LogSP_and_Roug] to 0. Otherwise, it will take a very long time to run algorithm EdgSeq, FixSP and FixSP-NoWei-Adp, LogSP (with same calculated distance of Roug-Ref) and Roug (with same calculated distance of Roug-Ref), because they perform very bad when terrain data is large. 
+We use algorithm EdgSeq-Adp (which involves FixSP) and set epsilon = 0.05 to simulate the exact path. So when you run the terrain data with dataset size more than 2000, we strongly encourage you to set [calculate_exact_path] to 0. Otherwise, it will take a very long time to simulate the exact path (which is not the main purpose of this project). You should simulate the exact path ONLY when you need to calculate the error ratio of the calculated path compared with the exact path in the experiment. In addition, when you run the terrain data with dataset size more than 20000, we strongly encourage you to set [calculate_FixSP_comp_and_LogSP_and_Roug] to 0. Otherwise, it will take a very long time to run algorithm EdgSeq-Adp, FixSP and FixSP-NoWei-Adp, EdgSeq (without error bound), LogSP (with same calculated distance of Roug-Ref) and Roug (with same calculated distance of Roug-Ref), because they perform very bad when terrain data is large. 
 
 An example:
 
@@ -117,7 +118,7 @@ An example:
 ./main EP_small.off 1 2 0 1
 ```
 
-In this example, EP_small.off is the terrain data file, epsilon is 1, removing value is 2, exact path will not be calculated, and algorithm EdgSeq, FixSP, FixSP-NoWei-Adp, Roug-Ref-Naive1, Roug-Ref-NoEffSP, LogSP (with same calculated distance of Roug-Ref) and Roug (with same calculated distance of Roug-Ref) will be included. Thus, it will run all 13 algorithms.
+In this example, EP_small.off is the terrain data file, epsilon is 1, removing value is 2, exact path will not be calculated, and algorithm EdgSeq, FixSP, FixSP-NoWei-Adp, Roug-Ref-Naive1, Roug-Ref-NoEffSP, EdgSeq (without error bound), LogSP (with same calculated distance of Roug-Ref) and Roug (with same calculated distance of Roug-Ref) will be included. Thus, it will run all 14 algorithms.
 
 ## Output
 

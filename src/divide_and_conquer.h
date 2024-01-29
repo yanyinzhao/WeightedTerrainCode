@@ -3059,7 +3059,7 @@ void fixed_Steiner_point_and_binary_search_snell_law_no_roug_ref(
     double Steiner_point_epsilon, int estimate_path_length,
     double snell_law_epsilon, double total_distance_exact_path,
     std::vector<geodesic::SurfacePoint> &result_path,
-    int calculate_exact_path)
+    int calculate_exact_path, int edg_one_edg_adp_two)
 {
     double building_time;
     double Steiner_point_query_time;
@@ -3210,7 +3210,14 @@ void fixed_Steiner_point_and_binary_search_snell_law_no_roug_ref(
     std::cout << "Total edge sequence size: " << total_edge_sequence_size << std::endl;
 
     std::ofstream ofs("../output/output.txt", std::ios_base::app);
-    ofs << "== EdgSeq ==\n";
+    if (edg_one_edg_adp_two == 1)
+    {
+        ofs << "== EdgSeq ==\n";
+    }
+    else if (edg_one_edg_adp_two == 2)
+    {
+        ofs << "== EdgSeq-Adp ==\n";
+    }
     ofs << write_file_header << "\t"
         << building_time << "\t"
         << Steiner_point_query_time << "\t"
