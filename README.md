@@ -1,8 +1,8 @@
-# Efficiently Finding Shortest Path on 3D Weighted Terrain Surfaces for Moving Objects
+# Efficient Shortest Path Queries on 3D Weighted Terrain Surfaces for Moving Objects
 
 ## Overview
 
-This project provides the implementation of the algorithm for efficiently finding the shortest path on 3D weighted terrain surface for moving objects. We refer the readers to our paper for more details.
+This project provides the implementation of the algorithm for efficiently shortest path queries on 3D weighted terrain surfaces for moving objects. We refer the readers to our paper for more details.
 
 We compared 14 algorithms as follows:
 
